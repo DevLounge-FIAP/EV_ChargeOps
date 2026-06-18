@@ -133,7 +133,7 @@ Com base nos dados processados pela IA, o Motor de Rateio calcula a fatura indiv
 
 ### Diagrama de arquitetura
 
-![Diagrama de Arquitetura da Solução](([imagens/diagrama_arquitetura.png](https://github.com/DevLounge-FIAP/EV_ChargeOps/blob/main/imagens/diagrama_arquitetura.png?raw=true)))
+![Diagrama de Arquitetura da Solução](https://github.com/DevLounge-FIAP/EV_ChargeOps/blob/main/imagens/diagrama_arquitetura.png?raw=true)
 
 *(O diagrama de arquitetura deve ser adicionado ao repositório com o nome `diagrama_arquitetura.png` e este link atualizado.)*
 
