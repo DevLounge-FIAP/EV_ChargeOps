@@ -133,7 +133,7 @@ Com base nos dados processados pela IA, o Motor de Rateio calcula a fatura indiv
 
 ### Diagrama de arquitetura
 
-![Diagrama de Arquitetura da Solução]((image.png))
+![Diagrama de Arquitetura da Solução]((imagens/diagrama_arquitetura.png))
 
 *(O diagrama de arquitetura deve ser adicionado ao repositório com o nome `diagrama_arquitetura.png` e este link atualizado.)*
 
