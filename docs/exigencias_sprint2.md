@@ -31,7 +31,7 @@ O crescimento acelerado de veículos elétricos impõe um problema operacional c
 
 Cada sessão de recarga produz dados úteis: duração, volume de energia entregue (kWh), horário de uso, frequência, picos e intervalos de ociosidade. Quando organizados, esses dados deixam de ser simples registros e passam a funcionar como base de inteligência operacional. O **EV ChargeOps** propõe exatamente essa transformação, com inteligência artificial como motor lógico da solução.
 
-> ### 💡 Pergunta Norteadora
+> ### Pergunta Norteadora
 > *Como transformar sessões de recarga de veículos elétricos em uma infraestrutura compartilhada em dados estruturados, rateio justo e inteligência acionável?*
 
 ---
@@ -68,7 +68,7 @@ No entanto, o código entregue deve ser **compreendido e autoral**. Isso signifi
 - **Senso crítico e decisão:** Decisões de arquitetura, escolha de tecnologias e lógica de negócio devem refletir o raciocínio da equipe, não sugestões copiadas sem análise crítica;
 - **Integridade acadêmica:** Código gerado por IA e incluído sem adaptação ou entendimento será identificado na avaliação.
 
-> ⚠️ *Um código que usa IA com inteligência é diferente de um código que foi copiado sem leitura crítica; a avaliação reconhece essa diferença.*
+> *Um código que usa IA com inteligência é diferente de um código que foi copiado sem leitura crítica; a avaliação reconhece essa diferença.*
 
 ---
 

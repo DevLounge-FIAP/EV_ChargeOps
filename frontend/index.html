@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV ChargeOps — Gestao & Rateio de Recarga GoodWe | FIAP</title>
+    <meta name="description" content="Plataforma de software para gestao e rateio de recargas de veiculos eletricos integrada ao carregador GoodWe HCA G2 e assistente IA EVA.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="dark-theme">
+    <!-- Header Principal -->
+    <header class="main-header" id="app-header">
+        <div class="header-container">
+            <div class="brand-group">
+                <div class="logo-badge">
+                    <span class="pulse-ring"></span>
+                    <span class="brand-icon-text">EV</span>
+                </div>
+                <div>
+                    <h1 class="brand-title">EV <span class="gradient-text">ChargeOps</span></h1>
+                    <p class="brand-subtitle">GoodWe HCA G2 &bull; FIAP Energy Innovation Lab</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div class="user-selector-container">
+                    <label for="user-unit-input" class="selector-label">Unidade / Apto:</label>
+                    <input type="text" id="user-unit-input" class="custom-input unit-input" placeholder="Ex: Apto 42B" value="Apto 42B">
+                </div>
+
+                <div class="system-status-badge" id="api-status" title="Conexao com a API FastAPI">
+                    <span class="status-dot"></span>
+                    <span class="status-text" id="status-label">Verificando API...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteudo Principal -->
+    <main class="main-container">
+        <!-- Grid de KPIs Gerais -->
+        <section class="kpi-grid" aria-label="Metricas Principais">
+            <div class="kpi-card" id="kpi-energy">
+                <div class="kpi-content">
+                    <span class="kpi-title">Energia Entregue</span>
+                    <h3 class="kpi-value" id="kpi-total-kwh">0,0 kWh</h3>
+                    <span class="kpi-meta">Total medido</span>
+                </div>
+            </div>
+
+            <div class="kpi-card" id="kpi-revenue">
+                <div class="kpi-content">
+                    <span class="kpi-title">Faturamento de Rateio</span>
+                    <h3 class="kpi-value" id="kpi-total-revenue">R$ 0,00</h3>
+                    <span class="kpi-meta">Individualizado por kWh</span>
+                </div>
+            </div>
+
+            <div class="kpi-card" id="kpi-charger">
+                <div class="kpi-content">
+                    <span class="kpi-title">Carregador GoodWe</span>
+                    <h3 class="kpi-value text-accent">HCA G2 (7.4 kW)</h3>
+                    <span class="kpi-meta status-online-text">&bull; Operacional (FIAP L1)</span>
+                </div>
+            </div>
+
+            <div class="kpi-card" id="kpi-rate">
+                <div class="kpi-content">
+                    <span class="kpi-title">Tarifa por kWh</span>
+                    <h3 class="kpi-value" id="kpi-current-rate">R$ 0,95</h3>
+                    <span class="kpi-meta">Energia + Manutencao</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Navegacao por Abas -->
+        <nav class="tabs-nav" aria-label="Abas da plataforma">
+            <button class="tab-btn active" data-tab="tab-chat" id="btn-tab-chat">
+                Assistente IA EVA
+                <span class="badge-tag">Contextual</span>
+            </button>
+            <button class="tab-btn" data-tab="tab-simulator" id="btn-tab-simulator">
+                Simulador de Recarga & Rateio
+            </button>
+            <button class="tab-btn" data-tab="tab-history" id="btn-tab-history">
+                Telemetria & Historico GoodWe
+            </button>
+        </nav>
+
+        <!-- Container das Abas -->
+        <div class="tab-content-wrapper">
+            
+            <!-- ABA 1: IA EVA (Chatbot) -->
+            <section id="tab-chat" class="tab-pane active" aria-labelledby="btn-tab-chat">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <div class="assistant-info">
+                            <div class="eva-avatar">
+                                <span>EVA</span>
+                            </div>
+                            <div>
+                                <h2 class="eva-title">EVA — Energy Virtual Assistant</h2>
+                                <p class="eva-subtitle">IA conectada a telemetria do sistema e as regras de rateio do condominio</p>
+                            </div>
+                        </div>
+                        <div class="chat-badge">
+                            Contexto Dinamico
+                        </div>
+                    </div>
+
+                    <!-- Sugestoes de Perguntas Rapidas -->
+                    <div class="quick-questions-container" id="quick-questions">
+                        <span class="quick-label">Perguntas frequentes:</span>
+                        <div class="chips-list">
+                            <button class="chip-btn" data-prompt="Quantas horas o carro aguenta com a bateria atual?">
+                                Quantas horas o carro aguenta?
+                            </button>
+                            <button class="chip-btn" data-prompt="Quantos kWh faltam para completar a carga?">
+                                Quantos kWh faltam para 100%?
+                            </button>
+                            <button class="chip-btn" data-prompt="Qual sera o custo estimado da recarga?">
+                                Qual o custo estimado da recarga?
+                            </button>
+                            <button class="chip-btn" data-prompt="Como funciona o modelo de rateio por kWh?">
+                                Como funciona o rateio?
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mensagens do Chat -->
+                    <div class="chat-messages" id="chat-messages-box">
+                        <div class="message-row assistant">
+                            <div class="msg-bubble">
+                                <div class="msg-sender">EVA &bull; IA Especialista</div>
+                                <div class="msg-text">
+                                    Ola! Sou a <strong>EVA</strong>, assistente virtual do <strong>EV ChargeOps</strong>.
+                                    <br><br>
+                                    Estou conectada ao carregador <strong>GoodWe HCA G2</strong> e as regras de rateio por kWh. Como posso ajudar com autonomia, simulacao de recarga ou calculos da fatura?
+                                </div>
+                                <div class="msg-time">Agora</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input de Chat -->
+                    <form class="chat-input-area" id="chat-form">
+                        <input 
+                            type="text" 
+                            id="chat-input" 
+                            placeholder="Faca uma pergunta sobre consumo, veiculo ou rateio..." 
+                            autocomplete="off"
+                            required
+                        >
+                        <button type="submit" id="btn-send-chat" class="send-btn">
+                            <span>Enviar</span>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- ABA 2: Simulador de Recarga & Rateio -->
+            <section id="tab-simulator" class="tab-pane" aria-labelledby="btn-tab-simulator">
+                <div class="simulator-layout">
+                    <div class="simulator-controls glass-panel">
+                        <h2 class="panel-heading">Parametrizacao da Recarga</h2>
+                        <p class="panel-desc">Simule o volume energetico, o tempo de conexao no GoodWe HCA G2 e o custo individualizado de rateio.</p>
+
+                        <div class="control-group">
+                            <label for="sim-battery">Capacidade da Bateria do Veiculo (kWh):</label>
+                            <input type="number" id="sim-battery" value="44.9" step="0.1" min="10" max="150" class="custom-input">
+                            <span class="input-hint">Capacidade nominal da bateria</span>
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <label for="sim-current-soc">Nivel Atual de Carga (%):</label>
+                                <span class="slider-val" id="val-current-soc">20%</span>
+                            </div>
+                            <input type="range" id="sim-current-soc" min="0" max="95" value="20" class="range-slider">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <label for="sim-target-soc">Nivel Desejado de Carga (%):</label>
+                                <span class="slider-val" id="val-target-soc">80%</span>
+                            </div>
+                            <input type="range" id="sim-target-soc" min="10" max="100" value="80" class="range-slider">
+                        </div>
+
+                        <div class="control-group">
+                            <label for="sim-power">Potencia do Carregador (kW):</label>
+                            <input type="number" id="sim-power" value="7.4" readonly class="custom-input readonly-input">
+                            <span class="input-hint">GoodWe HCA G2 (7.4 kW / 220V 32A Monofasico)</span>
+                        </div>
+
+                        <button id="btn-run-simulation" class="action-btn">
+                            <span>Calcular Simulacao</span>
+                        </button>
+                    </div>
+
+                    <!-- Resultados da Simulacao -->
+                    <div class="simulator-results glass-panel">
+                        <h2 class="panel-heading">Projecao & Calculo de Rateio</h2>
+                        <p class="panel-desc">Aplicacao direta da formula oficial: <code>Fatura = kWh × Tarifa</code></p>
+
+                        <div class="results-grid">
+                            <div class="result-box">
+                                <span class="res-label">Energia Necessaria</span>
+                                <h3 class="res-value text-accent" id="res-kwh">-- kWh</h3>
+                                <span class="res-sub">Volume a entregar</span>
+                            </div>
+
+                            <div class="result-box">
+                                <span class="res-label">Tempo Estimado de Carga</span>
+                                <h3 class="res-value" id="res-time">--</h3>
+                                <span class="res-sub">Eficiencia de 92%</span>
+                            </div>
+
+                            <div class="result-box highlight-box">
+                                <span class="res-label">Custo Estimado da Recarga</span>
+                                <h3 class="res-value text-green" id="res-cost">R$ --</h3>
+                                <span class="res-sub" id="res-rate-label">R$ 0,95 / kWh</span>
+                            </div>
+
+                            <div class="result-box">
+                                <span class="res-label">Autonomia Adicionada</span>
+                                <h3 class="res-value" id="res-range">-- km</h3>
+                                <span class="res-sub">Estimativa proporcional</span>
+                            </div>
+                        </div>
+
+                        <!-- Decomposicao Transparente do Rateio -->
+                        <div class="breakdown-box">
+                            <h4 class="breakdown-title">Detalhamento Transparente do Valor:</h4>
+                            <div class="breakdown-row">
+                                <span>Energia Efetiva (R$ 0,82/kWh):</span>
+                                <strong id="res-base-energy">R$ --</strong>
+                            </div>
+                            <div class="breakdown-row">
+                                <span>Quota de Manutencao do Carregador (R$ 0,13/kWh):</span>
+                                <strong id="res-maintenance">R$ --</strong>
+                            </div>
+                        </div>
+
+                        <!-- Acao de Pagamento -->
+                        <div class="payment-action-box">
+                            <button id="btn-simulate-payment" class="pay-btn">
+                                <span>Simular Autorizacao & Rateio</span>
+                            </button>
+                            <p class="payment-note" id="payment-status-msg">Integracao com a formula de faturamento individualizado.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 3: Telemetria & Historico GoodWe -->
+            <section id="tab-history" class="tab-pane" aria-labelledby="btn-tab-history">
+                <div class="history-layout glass-panel">
+                    <div class="history-header">
+                        <div>
+                            <h2 class="panel-heading">Registro de Sessoes de Recarga</h2>
+                            <p class="panel-desc">Dados extraidos do carregador GoodWe HCA G2 e sanitizados pelo backend.</p>
+                        </div>
+                        <div class="filter-group">
+                            <button id="btn-refresh-history" class="refresh-btn" title="Atualizar dados">Atualizar</button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="sessions-table">
+                            <thead>
+                                <tr>
+                                    <th>ID Sessao</th>
+                                    <th>Condomino</th>
+                                    <th>Unidade</th>
+                                    <th>Veiculo</th>
+                                    <th>Inicio</th>
+                                    <th>Duracao</th>
+                                    <th>Energia (kWh)</th>
+                                    <th>Rateio (R$)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessions-table-body">
+                                <tr>
+                                    <td colspan="9" class="loading-td">Nenhuma sessao registrada. Aguardando leitura do GoodWe HCA G2.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Rodape -->
+    <footer class="main-footer">
+        <div class="footer-container">
+            <p><strong>EV ChargeOps</strong> &bull; Enterprise Challenge 2026 &bull; GoodWe + FIAP (Energy Innovation Lab)</p>
+            <p class="footer-credits">Equipe {Dev}Lounge &bull; Aelton Soares &bull; Bruno Silva &bull; Michelly Lima &bull; Victor Mantovani</p>
+        </div>
+    </footer>
+
+    <!-- Scripts da Aplicacao -->
+    <script src="js/app.js"></script>
+</body>
+</html>
