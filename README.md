@@ -4,7 +4,6 @@
 
 **Integrantes:**
 - Aelton Soares de Menezes (RM:573694)
-- Maria (RM: 572267)
 - Michelly (RM: 573625)
 - Victor (RM: 570608)
 - Bruno (RM: 572073)
