@@ -1,1 +1,0 @@
-session_id,user_id,user_name,unit,vehicle_model,battery_capacity_kwh,start_time,end_time,duration_minutes,energy_delivered_kwh,power_peak_kw,voltage_v,current_a,cost_rate_per_kwh,total_cost_brl,status
