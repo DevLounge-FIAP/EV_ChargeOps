@@ -8,7 +8,7 @@ from ..schemas.models import (
 from ..services.billing_service import billing_service
 from ..services.data_service import data_service
 
-router = APIRouter(prefix="/api/billing", tags=["Tarifação & Motor de Rateio"])
+router = APIRouter(prefix="/api/billing", tags=["Tarifação & Pagamentos (Michelly)"])
 
 @router.post("/calculate", response_model=RateioCalculateResponse, summary="Calcula a fatura pelo modelo de rateio")
 def calculate_bill(request: RateioCalculateRequest):
@@ -26,8 +26,17 @@ def simulate_charge(request: SimulationRequest):
     """
     return billing_service.simulate_charge(request)
 
+@router.post("/checkout", summary="Simulação de checkout e autorização de recarga")
+def simulate_checkout(energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX"):
+    """
+    Ponto de conexão para Michelly:
+    Simula autorização digital de pagamento e emissão de comprovante individualizado.
+    """
+    return billing_service.process_checkout_simulation(energy_kwh=energy_kwh, unit=unit, payment_method=payment_method)
+
 @router.get("/config", summary="Retorna parâmetros tarifários do condomínio")
 def get_billing_config():
     """Retorna dados de taxa e tarifação configurados."""
     metadata = data_service.get_condo_metadata()
     return metadata.get("condominium", {})
+

@@ -6,6 +6,8 @@ from .config import settings
 from .api.routes_chat import router as chat_router
 from .api.routes_sessions import router as sessions_router
 from .api.routes_billing import router as billing_router
+from .api.routes_analytics import router as analytics_router
+from .api.routes_admin import router as admin_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -28,6 +30,9 @@ app.add_middleware(
 app.include_router(chat_router)
 app.include_router(sessions_router)
 app.include_router(billing_router)
+app.include_router(analytics_router)
+app.include_router(admin_router)
+
 
 @app.get("/api/status", tags=["Status"])
 def api_status():
