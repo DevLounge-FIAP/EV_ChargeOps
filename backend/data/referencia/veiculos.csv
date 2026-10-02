@@ -1,0 +1,4 @@
+id,marca,modelo,versao,capacidade_bateria_total_kwh,autonomia_inmetro_km,consumo_inmetro_mj_km,fonte
+1,Mercedes-Benz,EQE 350+,Sedan,96,421,0.65,Mercedes-Benz Brasil (bateria) e PBE Veicular/Inmetro (autonomia e consumo)
+2,BYD,Seal,Lancamento (AWD),82.5,372,0.62,BYD Brasil (bateria) e PBE Veicular/Inmetro (autonomia e consumo)
+3,Volvo,EX30,Plus Extended Range,69,338,0.52,Volvo Car Brasil (bateria) e PBE Veicular/Inmetro (autonomia e consumo)
