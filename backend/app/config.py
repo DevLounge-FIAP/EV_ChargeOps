@@ -23,7 +23,7 @@ class Settings:
     
     # Caminhos para arquivos de dados
     DATA_DIR: Path = BASE_DIR / "data"
-    CSV_FILE_PATH: Path = DATA_DIR / "goodwe_sessions_sample.csv"
+    CSV_FILE_PATH: Path = DATA_DIR / "tratados" / "estacao_diario.csv"
     JSON_FILE_PATH: Path = DATA_DIR / "ev_chargeops_data.json"
 
 settings = Settings()

@@ -3,7 +3,9 @@
  * Integracao com FastAPI & Assistente IA EVA (GoodWe + FIAP)
  */
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = (window.location.protocol === "http:" || window.location.protocol === "https:")
+    ? window.location.origin
+    : "http://localhost:8000";
 
 // Estado global da aplicacao
 const state = {

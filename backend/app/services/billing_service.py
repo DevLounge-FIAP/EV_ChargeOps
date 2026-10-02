@@ -72,4 +72,24 @@ class BillingService:
             estimated_added_range_km=added_range_km
         )
 
+    def process_checkout_simulation(self, energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX"):
+        """
+        Ponto de conexão para Michelly: Simulação de checkout e confirmação de pagamento digital.
+        Gera recibo de rateio atrelado à unidade do condômino.
+        """
+        rate = settings.DEFAULT_RATE_PER_KWH
+        total = round(energy_kwh * rate, 2)
+        import time
+        return {
+            "status": "approved",
+            "transaction_id": f"PAY-{int(time.time())}",
+            "unit": unit,
+            "energy_kwh": round(energy_kwh, 2),
+            "rate_per_kwh": rate,
+            "total_amount_brl": total,
+            "payment_method": payment_method,
+            "receipt_message": f"Pagamento simulado com sucesso para {unit}. Volume de {energy_kwh:.2f} kWh autorizado no GoodWe HCA G2."
+        }
+
 billing_service = BillingService()
+
