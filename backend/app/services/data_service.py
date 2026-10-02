@@ -5,16 +5,17 @@ from ..config import settings
 from ..schemas.models import SessionItem, MetricsResponse
 
 class DataService:
-    # Perfis de referência dos condôminos do condomínio parceiro (FIAP Energy Innovation Lab)
+        # Perfis simulados do condomínio: usuários e distribuição de veículos criados pelo grupo.
+    # Os veículos vêm do catálogo data/referencia/veiculos.csv (bateria total e autonomia Inmetro).
     DEFAULT_USERS = [
         {
             "user_id": "USR-001",
             "name": "Aelton Menezes",
             "unit": "Apto 42B",
             "vehicle": {
-                "model": "BYD Dolphin EV",
-                "battery_capacity_kwh": 44.9,
-                "estimated_range_km": 294
+                "model": "BYD Seal",
+                "battery_capacity_kwh": 82.5,
+                "estimated_range_km": 372
             }
         },
         {
@@ -22,9 +23,9 @@ class DataService:
             "name": "Michelly Lima",
             "unit": "Apto 15A",
             "vehicle": {
-                "model": "GWM Ora 03 Skin",
-                "battery_capacity_kwh": 48.0,
-                "estimated_range_km": 310
+                "model": "Volvo EX30",
+                "battery_capacity_kwh": 69.0,
+                "estimated_range_km": 338
             }
         },
         {
@@ -32,9 +33,9 @@ class DataService:
             "name": "Victor Mantovani",
             "unit": "Apto 83C",
             "vehicle": {
-                "model": "Volvo EX30 Core",
+                "model": "Volvo EX30",
                 "battery_capacity_kwh": 69.0,
-                "estimated_range_km": 476
+                "estimated_range_km": 338
             }
         },
         {
@@ -42,9 +43,9 @@ class DataService:
             "name": "Bruno Silva",
             "unit": "Apto 102",
             "vehicle": {
-                "model": "Renault Kwid E-Tech",
-                "battery_capacity_kwh": 26.8,
-                "estimated_range_km": 185
+                "model": "BYD Seal",
+                "battery_capacity_kwh": 82.5,
+                "estimated_range_km": 372
             }
         },
         {
@@ -52,15 +53,15 @@ class DataService:
             "name": "Lab FIAP",
             "unit": "Estacionamento L1",
             "vehicle": {
-                "model": "GoodWe Test EV",
-                "battery_capacity_kwh": 60.0,
-                "estimated_range_km": 380
+                "model": "Mercedes-Benz EQE 350+",
+                "battery_capacity_kwh": 96.0,
+                "estimated_range_km": 421
             }
         }
     ]
 
     def __init__(self):
-        self.csv_path = settings.CSV_FILE_PATH
+        self.csv_path = settings.SESSIONS_CSV_PATH
         self.json_path = settings.JSON_FILE_PATH
         self._cached_sessions: Optional[List[SessionItem]] = None
 
