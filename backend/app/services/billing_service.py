@@ -7,6 +7,15 @@ from ..schemas.models import (
 )
 from .data_service import data_service
 
+# Tempo de recarga calibrado com as 242 sessões reais do SEMS+ (R² 0,86, erro médio de 22 min):
+# tempo (h) = TEMPO_FIXO_H + TEMPO_POR_KWH_H x energia (kWh)
+TEMPO_FIXO_H = 0.94
+TEMPO_POR_KWH_H = 0.366
+
+# Média do consumo dos 3 modelos do catálogo (capacidade total ÷ autonomia Inmetro), em km por kWh.
+# Usada quando a requisição não informa a autonomia do veículo.
+KM_POR_KWH_PADRAO = 4.6
+
 class BillingService:
     def calculate_rateio(self, req: RateioCalculateRequest) -> RateioCalculateResponse:
         """
@@ -37,23 +46,29 @@ class BillingService:
         """
         Simula o carregamento relacionando:
         Tempo (horas) <-> Energia Entregue (kWh) <-> Custo Final (R$)
+        O tempo vem de uma relação calibrada com sessões reais, e a autonomia segue a
+        convenção capacidade total ÷ autonomia Inmetro de cada veículo.
         """
-        battery = sim.vehicle_battery_kwh or 44.9
-        cur_soc = max(0.0, min(sim.current_soc_percent or 20.0, 100.0))
-        target_soc = max(cur_soc, min(sim.target_soc_percent or 80.0, 100.0))
-        power = sim.charger_power_kw or 7.4
+        battery = sim.vehicle_battery_kwh or 69.0
+        cur_soc = 20.0 if sim.current_soc_percent is None else max(0.0, min(sim.current_soc_percent, 100.0))
+        target_soc = 80.0 if sim.target_soc_percent is None else max(cur_soc, min(sim.target_soc_percent, 100.0))
+        power = sim.charger_power_kw or 7.0
         rate = sim.rate_per_kwh or settings.DEFAULT_RATE_PER_KWH
 
         # Volume necessário em kWh
         delta_percent = (target_soc - cur_soc) / 100.0
         energy_needed = round(battery * delta_percent, 2)
 
-        # Tempo em horas considerando eficiência de 92% do carregador GoodWe
-        effective_power = power * 0.92
-        time_hours = round(energy_needed / effective_power, 2) if effective_power > 0 else 0.0
+        # Tempo em horas: relação calibrada nas sessões reais, com o piso físico da potência nominal
+        if energy_needed > 0:
+            calibrated_hours = TEMPO_FIXO_H + TEMPO_POR_KWH_H * energy_needed
+            minimum_hours = energy_needed / power
+            time_hours = round(max(calibrated_hours, minimum_hours), 2)
+        else:
+            time_hours = 0.0
 
         # Formatação horas e minutos
-        total_mins = int(time_hours * 60)
+        total_mins = int(round(time_hours * 60))
         hours = total_mins // 60
         mins = total_mins % 60
         formatted_time = f"{hours}h {mins:02d}min"
@@ -61,8 +76,12 @@ class BillingService:
         # Custo financeiro
         total_cost = round(energy_needed * rate, 2)
 
-        # Autonomia estimada adicionada (média de 6.8 km por kWh)
-        added_range_km = round(energy_needed * 6.8, 1)
+        # Autonomia adicionada: consumo do veículo = capacidade total ÷ autonomia Inmetro (km por kWh)
+        if sim.vehicle_range_km and battery > 0:
+            km_per_kwh = sim.vehicle_range_km / battery
+        else:
+            km_per_kwh = KM_POR_KWH_PADRAO
+        added_range_km = round(energy_needed * km_per_kwh, 1)
 
         return SimulationResponse(
             energy_needed_kwh=energy_needed,

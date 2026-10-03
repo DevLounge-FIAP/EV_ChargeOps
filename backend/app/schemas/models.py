@@ -71,10 +71,11 @@ class RateioCalculateResponse(BaseModel):
     breakdown: Dict[str, float]
 
 class SimulationRequest(BaseModel):
-    vehicle_battery_kwh: Optional[float] = Field(44.9, description="Capacidade total da bateria em kWh (ex: 44.9 do BYD Dolphin)")
+    vehicle_battery_kwh: Optional[float] = Field(69.0, description="Capacidade total da bateria em kWh (ex: 69.0 do Volvo EX30)")
+    vehicle_range_km: Optional[float] = Field(None, description="Autonomia oficial do veículo no ciclo Inmetro, em km (ex: 338 para o Volvo EX30)")
     current_soc_percent: Optional[float] = Field(20.0, description="Nível atual de carga (%)")
     target_soc_percent: Optional[float] = Field(80.0, description="Nível desejado de carga (%)")
-    charger_power_kw: Optional[float] = Field(7.4, description="Potência ativa do GoodWe HCA G2 em kW")
+    charger_power_kw: Optional[float] = Field(7.0, description="Potência nominal do carregador GoodWe em kW (GW7K: 7.0)")
     rate_per_kwh: Optional[float] = Field(0.95, description="Valor cobrado por kWh")
 
 class SimulationResponse(BaseModel):
