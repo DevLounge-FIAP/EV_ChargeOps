@@ -67,8 +67,8 @@ class DataService:
 
     def get_all_sessions(self) -> List[SessionItem]:
         """
-        Lê e estrutura as sessões a partir da fonte de dados oficial (estacao_diario.csv).
-        Suporta tanto dados diários agregados da estação GoodWe HCA G2 quanto CSVs com colunas diretas de sessão.
+        Lê as sessões de recarga do arquivo sessoes_condominio.csv (SESSIONS_CSV_PATH).
+        Horários, kWh e durações vêm do registro real do SEMS+. Usuário e veículo são simulados.
         """
         if self._cached_sessions is not None:
             return self._cached_sessions
@@ -81,81 +81,34 @@ class DataService:
             reader = csv.DictReader(f)
             fieldnames = reader.fieldnames or []
 
-            # Cenário 1: CSV já estruturado por sessão
-            if "session_id" in fieldnames:
-                for row in reader:
-                    try:
-                        item = SessionItem(
-                            session_id=row["session_id"].strip(),
-                            user_id=row["user_id"].strip(),
-                            user_name=row["user_name"].strip(),
-                            unit=row["unit"].strip(),
-                            vehicle_model=row["vehicle_model"].strip(),
-                            battery_capacity_kwh=float(row.get("battery_capacity_kwh") or 0.0),
-                            start_time=row["start_time"].strip(),
-                            end_time=row["end_time"].strip() if row.get("end_time") else None,
-                            duration_minutes=int(row.get("duration_minutes") or 0),
-                            energy_delivered_kwh=round(float(row.get("energy_delivered_kwh") or 0.0), 2),
-                            power_peak_kw=float(row.get("power_peak_kw") or 7.4),
-                            voltage_v=float(row.get("voltage_v") or 220.0),
-                            current_a=float(row.get("current_a") or 32.0),
-                            cost_rate_per_kwh=float(row.get("cost_rate_per_kwh") or settings.DEFAULT_RATE_PER_KWH),
-                            total_cost_brl=round(float(row.get("total_cost_brl") or 0.0), 2),
-                            status=row.get("status", "completed").strip()
-                        )
-                        sessions.append(item)
-                    except Exception:
-                        continue
+            if "session_id" not in fieldnames:
+                raise ValueError(
+                    f"{self.csv_path} não está no formato de sessões (coluna 'session_id' ausente)."
+                )
 
-            # Cenário 2: Fonte oficial da GoodWe tratada (estacao_diario.csv)
-            elif "energia_carregada_kwh" in fieldnames:
-                i = 0
-                for row in reader:
-                    try:
-                        kwh = float(row.get("energia_carregada_kwh") or 0.0)
-                        if kwh <= 0.0:
-                            continue
-
-                        data_str = row.get("data", "").strip()
-                        user = self.DEFAULT_USERS[i % len(self.DEFAULT_USERS)]
-                        rate = settings.DEFAULT_RATE_PER_KWH
-                        cost = round(kwh * rate, 2)
-                        
-                        # Cálculo de duração realista no carregador GoodWe HCA G2 (7.4 kW / 92% eficiência)
-                        effective_power = 7.4 * 0.92
-                        duration_mins = max(15, int((kwh / effective_power) * 60))
-
-                        # Formatação de horário
-                        start_h = 8 + (i % 12)
-                        start_m = (i * 17) % 60
-                        start_time = f"{data_str} {start_h:02d}:{start_m:02d}"
-                        end_total_m = start_m + duration_mins
-                        end_h = (start_h + end_total_m // 60) % 24
-                        end_m = end_total_m % 60
-                        end_time = f"{data_str} {end_h:02d}:{end_m:02d}"
-
-                        item = SessionItem(
-                            session_id=f"GW-{data_str.replace('-', '')}-{i+1:03d}",
-                            user_id=user["user_id"],
-                            user_name=user["name"],
-                            unit=user["unit"],
-                            vehicle_model=user["vehicle"]["model"],
-                            battery_capacity_kwh=user["vehicle"]["battery_capacity_kwh"],
-                            start_time=start_time,
-                            end_time=end_time,
-                            duration_minutes=duration_mins,
-                            energy_delivered_kwh=round(kwh, 2),
-                            power_peak_kw=7.4,
-                            voltage_v=220.0,
-                            current_a=32.0,
-                            cost_rate_per_kwh=rate,
-                            total_cost_brl=cost,
-                            status="completed"
-                        )
-                        sessions.append(item)
-                        i += 1
-                    except Exception:
-                        continue
+            for row in reader:
+                try:
+                    item = SessionItem(
+                        session_id=row["session_id"].strip(),
+                        user_id=row["user_id"].strip(),
+                        user_name=row["user_name"].strip(),
+                        unit=row["unit"].strip(),
+                        vehicle_model=row["vehicle_model"].strip(),
+                        battery_capacity_kwh=float(row.get("battery_capacity_kwh") or 0.0),
+                        start_time=row["start_time"].strip(),
+                        end_time=row["end_time"].strip() if row.get("end_time") else None,
+                        duration_minutes=int(row.get("duration_minutes") or 0),
+                        energy_delivered_kwh=round(float(row.get("energy_delivered_kwh") or 0.0), 2),
+                        power_peak_kw=float(row.get("power_peak_kw") or 7.4),
+                        voltage_v=float(row.get("voltage_v") or 220.0),
+                        current_a=float(row.get("current_a") or 32.0),
+                        cost_rate_per_kwh=float(row.get("cost_rate_per_kwh") or settings.DEFAULT_RATE_PER_KWH),
+                        total_cost_brl=round(float(row.get("total_cost_brl") or 0.0), 2),
+                        status=row.get("status", "completed").strip()
+                    )
+                    sessions.append(item)
+                except Exception:
+                    continue
 
         # Ordena do mais recente para o mais antigo
         sessions.reverse()
