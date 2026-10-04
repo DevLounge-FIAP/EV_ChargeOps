@@ -16,6 +16,10 @@ from .data_service import data_service
 # Data que separa treino (antes) e teste (a partir dela) na validação por data.
 DATA_CORTE_VALIDACAO = "2026-06-01"
 
+# Precificação dinâmica: quanto a tarifa do pico fica acima da tarifa base.
+# 1.20 = pico 20% mais caro que a base (o desconto fora do pico é calculado).
+FATOR_PICO = 1.20
+
 # pandas: segunda = 0 ... domingo = 6
 NOMES_DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 
@@ -49,6 +53,47 @@ class MlService:
         hora_inicio = int(janela.idxmax())
         percentual = float(janela.max() / por_hora.sum() * 100)
         return hora_inicio, round(percentual, 1)
+
+
+    def _energia_por_hora_inicio(self) -> pd.Series:
+        """kWh de recarga somados pela hora de INÍCIO da sessão (índice 0 a 23)."""
+        sessoes = data_service.get_all_sessions()
+        hora = pd.Series([pd.Timestamp(s.start_time).hour for s in sessoes])
+        kwh = pd.Series([s.energy_delivered_kwh for s in sessoes])
+        return kwh.groupby(hora).sum().reindex(range(24), fill_value=0.0)
+
+    def _calcular_tarifas(self) -> Dict[str, Any]:
+        """
+        Tarifa do pico e tarifa fora do pico. O pico é a janela de 2 horas em que
+        mais sessões COMEÇAM. As tarifas são calculadas para que a receita seja a
+        mesma da tarifa fixa, desde que ninguém mude o horário de recarga.
+        """
+        por_hora = self._energia_por_hora_inicio()
+        hora_pico, _ = self._horario_pico()
+        horas_pico = [h for h in (hora_pico, hora_pico + 1) if h < 24]
+
+        total = float(por_hora.sum())
+        energia_pico = float(por_hora[horas_pico].sum())
+        parcela_pico = energia_pico / total
+
+        base = settings.DEFAULT_RATE_PER_KWH
+        tarifa_pico = base * FATOR_PICO
+        tarifa_fora = base * (1 - parcela_pico * FATOR_PICO) / (1 - parcela_pico)
+        if tarifa_fora <= 0:
+            raise ValueError(
+                f"FATOR_PICO={FATOR_PICO} é alto demais: a tarifa fora do pico ficaria "
+                f"{tarifa_fora:.2f}. Use um fator menor que {1 / parcela_pico:.2f}."
+            )
+
+        return {
+            "base": base,
+            "horas_pico": horas_pico,
+            "parcela_pico": parcela_pico,
+            "tarifa_pico": tarifa_pico,
+            "tarifa_fora": tarifa_fora,
+            "receita_fixa": total * base,
+            "receita_dinamica": energia_pico * tarifa_pico + (total - energia_pico) * tarifa_fora,
+        }    
 
     # ------------------------------------------------------------------
     # Modelo
@@ -177,6 +222,51 @@ class MlService:
                 "Os dados vêm de um único cartão RFID; usuários e veículos são simulados.",
             ],
         }
+
+
+    def get_dynamic_pricing(self) -> Dict[str, Any]:
+        """Tarifas por horário de início da sessão: mais caro no pico, mais barato fora."""
+        try:
+            t = self._calcular_tarifas()
+        except Exception as e:
+            return {"error": f"Falha ao calcular a precificação dinâmica: {str(e)}"}
+
+        h0, h1 = t["horas_pico"][0], t["horas_pico"][-1]
+        tabela = [
+            {
+                "hora_inicio": h,
+                "faixa": "pico" if h in t["horas_pico"] else "fora_do_pico",
+                "tarifa_brl_kwh": round(t["tarifa_pico"] if h in t["horas_pico"] else t["tarifa_fora"], 2),
+            }
+            for h in range(24)
+        ]
+
+        return {
+            "metodologia": (
+                "A tarifa depende da hora em que a sessão COMEÇA e vale para a sessão inteira. "
+                f"O pico são as sessões iniciadas das {h0}:00 às {h1}:59, a janela de 2 horas "
+                f"que concentra {t['parcela_pico'] * 100:.1f}% da energia. "
+                f"Tarifa do pico = tarifa base x {FATOR_PICO}. A tarifa fora do pico é calculada "
+                "para a receita ficar igual à da tarifa fixa se ninguém mudar o horário de recarga."
+            ),
+            "tarifa_base_brl_kwh": t["base"],
+            "fator_pico": FATOR_PICO,
+            "janela_pico": {"hora_inicio": h0, "hora_fim": h1},
+            "parcela_energia_pico_pct": round(t["parcela_pico"] * 100, 1),
+            "tarifa_pico_brl_kwh": round(t["tarifa_pico"], 2),
+            "tarifa_fora_pico_brl_kwh": round(t["tarifa_fora"], 2),
+            "variacao_fora_pico_pct": round((t["tarifa_fora"] / t["base"] - 1) * 100, 1),
+            "conferencia_receita": {
+                "receita_tarifa_fixa_brl": round(t["receita_fixa"], 2),
+                "receita_tarifa_dinamica_brl": round(t["receita_dinamica"], 2),
+            },
+            "tabela_por_hora_inicio": tabela,
+            "observacoes": [
+                "A janela de pico é a de início das sessões; a carga na rede se estende por mais horas.",
+                "Se parte do consumo sair do pico, o pico cai e a receita fica um pouco abaixo da tarifa fixa.",
+                "Os dados vêm de um único cartão RFID; usuários e veículos são simulados.",
+            ],
+        }    
 
 
 ml_service = MlService()
