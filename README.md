@@ -182,7 +182,7 @@ backend/
 
 ## 8. Módulo 4: Dashboard Administrativo & Gestão (Bruno Santos)
 
-> *Espaço reservado para documentação do dashboard gerencial e painel de controle de Bruno Silva.*
+> *Espaço reservado para documentação do dashboard gerencial e painel de controle de Bruno Santos.*
 
 ### Onde conectar seu código:
 - **Rotas de Gestão:** `backend/app/api/routes_admin.py`
