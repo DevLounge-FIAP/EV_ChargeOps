@@ -1,14 +1,18 @@
 """
 Rotas do Dashboard Administrativo & Gestão — EV ChargeOps
-Responsável: Bruno Silva
+Responsável: Bruno Santos
 """
 
-from fastapi import APIRouter
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Query
 import pandas as pd
 from ..config import settings
 from ..services.data_service import data_service
+from ..services.dashboard_service import dashboard_service
 
-router = APIRouter(prefix="/api/admin", tags=["Dashboard & Gestão Administrativa (Bruno Silva)"])
+router = APIRouter(prefix="/api/admin", tags=["Dashboard & Gestão Administrativa (Bruno Santos)"])
 
 @router.get("/overview", summary="Visão consolidada para o síndico e administradora")
 def get_admin_overview():
@@ -55,3 +59,32 @@ def get_efficiency_indicators():
         "total_geracao_solar_kwh": round(float(df["geracao_kwh"].sum()), 2),
         "total_consumo_kwh": round(float(df["consumo_kwh"].sum()), 2)
     }
+
+
+# Rotas usadas pela aba "Dashboard Administrativo"
+
+@router.get("/dashboard", summary="Métricas gerais do dashboard (consumo, bateria, tempo, faturamento, eficiência)")
+def get_dashboard(
+    user_id: Optional[str] = Query(None, description="Filtra por usuário, ex: USR-001"),
+    inicio: Optional[date] = Query(None, description="Data inicial (AAAA-MM-DD)"),
+    fim: Optional[date] = Query(None, description="Data final (AAAA-MM-DD), inclusive"),
+):
+    """KPIs, séries mensais, resumo por usuário e veículo e avisos sobre os dados."""
+    return dashboard_service.dashboard(user_id, inicio, fim)
+
+@router.get("/payments", summary="Histórico de pagamentos (rateio por sessão)")
+def get_payments(
+    user_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="Ex: completed"),
+    inicio: Optional[date] = Query(None),
+    fim: Optional[date] = Query(None),
+    limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """Pagamentos por sessão (kWh x tarifa), do mais recente para o mais antigo, com paginação."""
+    return dashboard_service.pagamentos(user_id, status, inicio, fim, limit, offset)
+
+@router.get("/chargers", summary="Gestão de carregadores: especificações e uso")
+def get_chargers():
+    """Dados do carregador GoodWe e indicadores de uso (sessões, horas e ocupação)."""
+    return dashboard_service.carregadores()

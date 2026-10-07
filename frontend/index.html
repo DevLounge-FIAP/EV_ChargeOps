@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body class="dark-theme">
     <!-- Header Principal -->
@@ -88,6 +89,9 @@
             </button>
             <button class="tab-btn" data-tab="tab-history" id="btn-tab-history">
                 Telemetria & Historico GoodWe
+            </button>
+            <button class="tab-btn" data-tab="tab-dashboard" id="btn-tab-dashboard">
+                Dashboard Administrativo
             </button>
         </nav>
 
@@ -294,6 +298,147 @@
                     </div>
                 </div>
             </section>
+
+            <!-- ABA 4: Dashboard Administrativo (Bruno Santos) -->
+            <section id="tab-dashboard" class="tab-pane" aria-labelledby="btn-tab-dashboard">
+                <div class="dash-wrap">
+                    <div class="glass-panel dash-toolbar">
+                        <div>
+                            <h2 class="panel-heading">Dashboard Administrativo</h2>
+                            <p class="panel-desc">Métricas gerais e gestão de usuários, carregadores e pagamentos, calculadas pela API (<code>/api/admin</code>).</p>
+                        </div>
+                        <div class="dash-filters">
+                            <label>Usuário
+                                <select id="dash-user" class="custom-input"><option value="">Todos</option></select>
+                            </label>
+                            <label>De <input type="date" id="dash-inicio" class="custom-input"></label>
+                            <label>Até <input type="date" id="dash-fim" class="custom-input"></label>
+                            <button id="dash-refresh" class="refresh-btn" type="button">Atualizar</button>
+                        </div>
+                    </div>
+                    <p id="dash-status" class="dash-status" role="status"></p>
+
+                    <section class="kpi-grid dash-kpis" aria-label="Metricas gerais">
+                    <div class="kpi-card"><div class="kpi-content">
+                        <span class="kpi-title">Consumo</span>
+                        <h3 class="kpi-value" id="dk-consumo">--</h3>
+                        <span class="kpi-meta" id="dk-consumo-meta">&nbsp;</span>
+                    </div></div>
+                    <div class="kpi-card"><div class="kpi-content">
+                        <span class="kpi-title">Bateria</span>
+                        <h3 class="kpi-value" id="dk-bateria">--</h3>
+                        <span class="kpi-meta" id="dk-bateria-meta">&nbsp;</span>
+                    </div></div>
+                    <div class="kpi-card"><div class="kpi-content">
+                        <span class="kpi-title">Tempo médio de carga</span>
+                        <h3 class="kpi-value" id="dk-tempo">--</h3>
+                        <span class="kpi-meta" id="dk-tempo-meta">&nbsp;</span>
+                    </div></div>
+                    <div class="kpi-card"><div class="kpi-content">
+                        <span class="kpi-title">Faturamento</span>
+                        <h3 class="kpi-value" id="dk-fatura">--</h3>
+                        <span class="kpi-meta" id="dk-fatura-meta">&nbsp;</span>
+                    </div></div>
+                    <div class="kpi-card"><div class="kpi-content">
+                        <span class="kpi-title">Autoconsumo</span>
+                        <h3 class="kpi-value" id="dk-auto">--</h3>
+                        <span class="kpi-meta" id="dk-auto-meta">&nbsp;</span>
+                    </div></div>
+                    <div class="kpi-card"><div class="kpi-content">
+                        <span class="kpi-title">Produtividade solar</span>
+                        <h3 class="kpi-value" id="dk-prod">--</h3>
+                        <span class="kpi-meta" id="dk-prod-meta">&nbsp;</span>
+                    </div></div>
+                    </section>
+
+                    <div class="dash-charts">
+                    <div class="chart-card">
+                        <h3>Consumo mensal</h3>
+                        <p class="chart-sub">Energia entregue nas sessões, em kWh</p>
+                        <div class="chart-box"><canvas id="ch-energia"></canvas><p class="chart-empty">Sem dados no período</p></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Bateria por veículo</h3>
+                        <p class="chart-sub">% médio da bateria carregada por sessão (estimado)</p>
+                        <div class="chart-box"><canvas id="ch-bateria"></canvas><p class="chart-empty">Sem dados no período</p></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Tempo médio de carga</h3>
+                        <p class="chart-sub">Minutos por sessão, por condômino</p>
+                        <div class="chart-box"><canvas id="ch-tempo"></canvas><p class="chart-empty">Sem dados no período</p></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Faturamento mensal</h3>
+                        <p class="chart-sub">Rateio das sessões, em R$</p>
+                        <div class="chart-box"><canvas id="ch-fatura"></canvas><p class="chart-empty">Sem dados no período</p></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Geração × consumo da estação</h3>
+                        <p class="chart-sub">kWh por mês (estação solar GoodWe)</p>
+                        <div class="chart-box"><canvas id="ch-estacao"></canvas><p class="chart-empty">Sem dados no período</p></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Eficiência energética</h3>
+                        <p class="chart-sub">Autoconsumo e contribuição, % por mês</p>
+                        <div class="chart-box"><canvas id="ch-eficiencia"></canvas><p class="chart-empty">Sem dados no período</p></div>
+                    </div>
+                    </div>
+
+                    <div class="glass-panel dash-warnings" id="dash-warnings">
+                        <h3>Limitações dos dados</h3>
+                        <ul id="dash-warnings-list"></ul>
+                    </div>
+
+                    <h3 class="dash-section-title">Painel administrativo</h3>
+
+                    <div class="glass-panel dash-admin-block">
+                        <h3>Usuários e veículos</h3>
+                        <p class="panel-desc">Condôminos cadastrados, veículo e consumo no período filtrado.</p>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead><tr>
+                                    <th>Condômino</th><th>Unidade</th><th>Veículo</th>
+                                    <th class="num">Sessões</th><th class="num">Energia</th><th class="num">Rateio</th>
+                                    <th class="num">Tempo médio</th><th>Última sessão</th>
+                                </tr></thead>
+                                <tbody id="dash-users-body"><tr><td colspan="8" class="dash-empty-td">Carregando...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel dash-admin-block">
+                        <h3>Carregadores</h3>
+                        <p class="panel-desc">Especificações e uso do ponto de recarga.</p>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead><tr>
+                                    <th>Equipamento</th><th class="num">Potência</th><th>Conector</th><th>Status</th>
+                                    <th class="num">Sessões</th><th class="num">Energia</th><th class="num">Horas em uso</th><th class="num">Ocupação</th>
+                                </tr></thead>
+                                <tbody id="dash-chargers-body"><tr><td colspan="8" class="dash-empty-td">Carregando...</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel dash-admin-block">
+                        <h3>Histórico de pagamentos</h3>
+                        <p class="panel-desc">Rateio individual por sessão (kWh × tarifa), do mais recente para o mais antigo.</p>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead><tr>
+                                    <th>Sessão</th><th>Condômino</th><th>Unidade</th><th>Início</th>
+                                    <th class="num">Energia</th><th class="num">Tarifa</th><th class="num">Valor</th><th>Status</th>
+                                </tr></thead>
+                                <tbody id="dash-pay-body"><tr><td colspan="8" class="dash-empty-td">Carregando...</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div class="dash-table-footer">
+                            <span id="dash-pay-info"></span>
+                            <button id="dash-pay-more" class="refresh-btn" type="button" disabled>Ver mais</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </main>
 
@@ -301,11 +446,13 @@
     <footer class="main-footer">
         <div class="footer-container">
             <p><strong>EV ChargeOps</strong> &bull; Enterprise Challenge 2026 &bull; GoodWe + FIAP (Energy Innovation Lab)</p>
-            <p class="footer-credits">Equipe {Dev}Lounge &bull; Aelton Soares &bull; Bruno Silva &bull; Michelly Lima &bull; Victor Mantovani</p>
+            <p class="footer-credits">Equipe {Dev}Lounge &bull; Aelton Soares &bull; Bruno Santos &bull; Michelly Lima &bull; Victor Mantovani</p>
         </div>
     </footer>
 
     <!-- Scripts da Aplicacao -->
     <script src="js/app.js"></script>
+    <script src="js/vendor/chart.umd.js"></script>
+    <script src="js/dashboard.js"></script>
 </body>
 </html>

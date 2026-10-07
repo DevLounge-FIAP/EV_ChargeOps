@@ -1,0 +1,88 @@
+/* Estilos da aba "Dashboard Administrativo" (Bruno Santos) */
+
+.dash-wrap { display: flex; flex-direction: column; gap: 22px; }
+
+.dash-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+.dash-toolbar .panel-desc { margin-bottom: 0; }
+
+.dash-filters { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.dash-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.dash-filters .custom-input {
+    width: auto;
+    min-width: 150px;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    color-scheme: dark;
+}
+
+.dash-status { min-height: 1.2em; margin: 0; font-size: 0.85rem; color: var(--text-secondary); }
+.dash-status.error { color: #f87171; }
+
+.dash-kpis { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 0; }
+
+.dash-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+    gap: 18px;
+}
+.chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-card);
+    min-width: 0;
+}
+.chart-card h3 { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 600; margin: 0 0 2px; }
+.chart-sub { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 12px; }
+.chart-box { position: relative; height: 260px; }
+.chart-empty {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+.chart-box.is-empty .chart-empty { display: flex; }
+.chart-box.is-empty canvas { visibility: hidden; }
+
+.dash-warnings { border-left: 3px solid var(--accent-amber); padding: 18px 22px; }
+.dash-warnings h3 { font-size: 0.95rem; margin: 0 0 8px; color: var(--accent-amber); }
+.dash-warnings ul { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; }
+
+.dash-section-title { font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; margin: 8px 0 -6px; }
+.dash-admin-block h3 { font-size: 1rem; font-weight: 600; margin: 0 0 4px; }
+.dash-admin-block .panel-desc { margin-bottom: 14px; }
+
+.data-table td.num, .data-table th.num { text-align: right; white-space: nowrap; }
+.dash-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--accent-green);
+}
+.dash-badge.warn { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+.dash-empty-td { text-align: center; color: var(--text-muted); padding: 22px; }
+
+.dash-table-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.dash-table-footer span { font-size: 0.82rem; color: var(--text-secondary); }
+.refresh-btn:disabled { opacity: 0.45; cursor: not-allowed; }
