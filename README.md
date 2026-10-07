@@ -8,7 +8,7 @@
 - **Aelton Soares de Menezes** (RM: 573694) — *Backend REST API, IA EVA & Frontend Web*
 - **Victor Mantovani** (RM: 570608) — *Machine Learning & Analytics*
 - **Michelly Lima** (RM: 573625) — *Sistema de Tarifação & Simulação de Pagamentos*
-- **Bruno Silva** (RM: 572073) — *Dashboard Administrativo, Gestão & Documentação*
+- **Bruno Santos** (RM: 572073) — *Dashboard Administrativo, Gestão & Documentação*
 
 ---
 
@@ -182,14 +182,89 @@ backend/
 
 ## 8. Módulo 4: Dashboard Administrativo & Gestão (Bruno Santos)
 
-> *Espaço reservado para documentação do dashboard gerencial e painel de controle de Bruno Santos.*
+Esta é a aba **Dashboard Administrativo** do site. Ela mostra as métricas gerais da recarga e da estação solar e tem um painel de consulta com usuários, carregadores e pagamentos. Os cálculos são feitos em Python (pandas), dentro da API. O navegador só desenha o resultado.
 
-### Onde conectar seu código:
-- **Rotas de Gestão:** `backend/app/api/routes_admin.py`
-  - Endpoints já disponíveis: `GET /api/admin/overview`, `GET /api/admin/users` e `GET /api/admin/efficiency-indicators`.
-- **Consumo de Dados:** O painel administrativo pode consumir diretamente os endpoints REST acima ou ler o arquivo `backend/data/tratados/estacao_diario.csv`.
+### 8.1 Como funciona
 
-*(Bruno: adicione aqui a documentação do dashboard administrativo, métricas para o síndico, gestão de usuários e indicadores de eficiência energética).*
+```
+sessoes_condominio.csv --+
+estacao_diario.csv ------+--> DataService e DashboardService (pandas) --> /api/admin --> aba do site
+cadastro de usuarios ----+
+```
+
+| Arquivo | O que faz |
+|---|---|
+| `backend/app/services/dashboard_service.py` | Calcula as métricas, as séries mensais, o resumo por usuário e veículo, os pagamentos e os dados do carregador |
+| `backend/app/api/routes_admin.py` | Rotas `/api/admin/*`. As três rotas que já existiam foram mantidas |
+| `frontend/js/dashboard.js` e `frontend/css/dashboard.css` | Aba do dashboard: busca os dados na API e desenha cartões, gráficos e tabelas |
+| `frontend/js/vendor/chart.umd.js` | Biblioteca Chart.js 4.4.1 (licença MIT), guardada no projeto para funcionar sem internet |
+| `backend/tests/test_dashboard_service.py` | Testes automáticos do serviço |
+
+### 8.2 Rotas
+
+| Rota | O que devolve |
+|---|---|
+| `GET /api/admin/dashboard` | Métricas, séries mensais, resumo por usuário e veículo e avisos. Aceita os filtros `user_id`, `inicio` e `fim` (AAAA-MM-DD) |
+| `GET /api/admin/payments` | Histórico de pagamentos por sessão, com paginação (`limit` e `offset`) |
+| `GET /api/admin/chargers` | Dados do carregador e indicadores de uso |
+| `GET /api/admin/overview`, `/users`, `/efficiency-indicators` | Rotas anteriores, mantidas |
+
+### 8.3 Métricas e como são calculadas
+
+| Métrica | Fonte | Cálculo |
+|---|---|---|
+| Consumo | `sessoes_condominio.csv` | Soma de `energy_delivered_kwh` (total, média por sessão, por mês e por usuário) |
+| Bateria | `sessoes_condominio.csv` | Estimativa: energia entregue dividida pela capacidade da bateria do veículo, por sessão |
+| Tempo médio de carga | `sessoes_condominio.csv` | Média de `duration_minutes` (também mediana e maior sessão) |
+| Faturamento | `sessoes_condominio.csv` | Soma de `total_cost_brl` (kWh x tarifa), por mês e por usuário |
+| Eficiência energética | `estacao_diario.csv` | Autoconsumo = autoconsumo / (autoconsumo + exportação). Contribuição = autoconsumo / consumo. Produtividade = geração / 6 kWp. Os percentuais são recalculados sobre a soma do período, e não pela média dos percentuais diários |
+
+### 8.4 Painel administrativo
+
+- **Usuários e veículos:** cadastro com unidade, veículo, sessões, energia, rateio, tempo médio e última sessão.
+- **Carregadores:** modelo, potência, conector, status, sessões, energia, horas em uso e taxa de ocupação.
+- **Pagamentos:** histórico por sessão (kWh x tarifa), com filtro por usuário e período e botão "Ver mais".
+
+O painel é de consulta. O projeto não tem banco de dados, então não há cadastro, edição nem baixa de pagamentos.
+
+### 8.5 Decisões técnicas e desvios em relação ao plano
+
+- **Dashboard feito em código, e não em ferramenta de BI.** Foi usado FastAPI com Chart.js, pelo mesmo motivo da troca do n8n (seção 2): manter a regra de negócio no código do grupo e não depender de serviço externo na avaliação.
+- **Nível da bateria estimado.** O carregador não informa o nível de carga (SoC) do veículo. O percentual mostrado é energia entregue dividida pela capacidade da bateria, e a tela avisa isso.
+- **Inadimplência não calculada.** Os dados só têm sessões concluídas e nenhuma informação de pagamento. A tela mostra "sem dados" em vez de um valor inventado.
+- **Gestão de credenciais não implementada.** O plano do módulo (`docs/Decisões Sprint 2.md`, seção 2.5) cita credenciais, mas o projeto não tem login nem banco de dados.
+- **Painel somente de consulta**, pelo mesmo motivo (sem banco de dados).
+- **`energia_carregada_kwh` da estação não é tratada como recarga de veículos** e não entra no consumo das sessões (ver `docs/Decisões Sprint 2.md`).
+- **Usuários e veículos são simulados.** Horários, energia (kWh) e durações vêm do registro real do SEMS+.
+- **Tarifa de R$ 0,95/kWh provisória**, ainda a confirmar com o grupo.
+
+### 8.6 Como executar e testar
+
+Com um comando só (cria o ambiente virtual, instala as dependências e sobe a API e o site):
+
+- **Windows:** dar dois cliques em `iniciar.bat`, ou rodar `iniciar.bat` no terminal.
+- **Git Bash, Linux ou Mac:** `bash iniciar.sh`
+
+Depois, abrir `http://localhost:8000` e clicar na aba "Dashboard Administrativo". O backend FastAPI já entrega o frontend, então existe um único processo e não é preciso subir o site separado.
+
+Execução manual (alternativa):
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/Scripts/activate      # Windows (Git Bash). No Linux/Mac: source .venv/bin/activate
+pip install -r requirements.txt
+python run.py
+```
+
+Testes automáticos (dentro da pasta `backend`, com o ambiente virtual ativo):
+
+```bash
+pip install pytest
+python -m pytest tests -v
+```
+
+A documentação das rotas fica em `http://localhost:8000/docs`.
 
 ---
 
@@ -202,3 +277,13 @@ backend/
 - [ ] Captura de tela da simulação paramétrica de recarga e cálculo de rateio;
 - [ ] Captura de tela da tabela de histórico com as 285 sessões do GoodWe HCA G2;
 - [ ] Link do vídeo pitch de 3 minutos para validação presencial da FIAP.
+
+### Dashboard Administrativo (Bruno Santos)
+
+Capturas de tela da aba, com a API rodando em `http://localhost:8000`:
+
+![Cartões de métricas e gráficos](imagens/dashboard_cartoes_graficos.png)
+
+![Limitações dos dados e tabela de usuários e veículos](imagens/dashboard_usuarios_limitacoes.png)
+
+![Tabela de carregadores e histórico de pagamentos](imagens/dashboard_carregadores_pagamentos.png)
