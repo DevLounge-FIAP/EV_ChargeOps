@@ -69,6 +69,7 @@ class RateioCalculateResponse(BaseModel):
     formula_applied: str
     total_amount_brl: float
     breakdown: Dict[str, float]
+    rate_reason: str
 
 class SimulationRequest(BaseModel):
     vehicle_battery_kwh: Optional[float] = Field(69.0, description="Capacidade total da bateria em kWh (ex: 69.0 do Volvo EX30)")
@@ -76,7 +77,7 @@ class SimulationRequest(BaseModel):
     current_soc_percent: Optional[float] = Field(20.0, description="Nível atual de carga (%)")
     target_soc_percent: Optional[float] = Field(80.0, description="Nível desejado de carga (%)")
     charger_power_kw: Optional[float] = Field(7.0, description="Potência nominal do carregador GoodWe em kW (GW7K: 7.0)")
-    rate_per_kwh: Optional[float] = Field(0.95, description="Valor cobrado por kWh")
+    rate_per_kwh: Optional[float] = Field(None, description="Valor cobrado por kWh (tarifa da hora será usado caso vazio)")
 
 class SimulationResponse(BaseModel):
     energy_needed_kwh: float
