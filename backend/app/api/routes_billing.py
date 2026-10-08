@@ -39,3 +39,4 @@ def get_billing_config():
     """Retorna dados de taxa e tarifação configurados."""
     metadata = data_service.get_condo_metadata()
     return metadata.get("condominium", {})
+
