@@ -1,14 +1,14 @@
 # EV ChargeOps | GoodWe + FIAP
 ## Plataforma de Gestão, Rateio Individual e IA Conversacional para Recarga de Veículos Elétricos
 
-> **Enterprise Challenge 2026** — FIAP & GoodWe (Energy Innovation Lab - Estacionamento L1)  
+> **Enterprise Challenge 2026** - FIAP & GoodWe (Energy Innovation Lab - Estacionamento L1)  
 > **Equipe:** `{Dev}Lounge`
 
 ### Integrantes da Equipe
-- **Aelton Soares de Menezes** (RM: 573694) — *Backend REST API, IA EVA & Frontend Web*
-- **Victor Mantovani** (RM: 570608) — *Machine Learning & Analytics*
-- **Michelly Lima** (RM: 573625) — *Sistema de Tarifação & Simulação de Pagamentos*
-- **Bruno Santos** (RM: 572073) — *Dashboard Administrativo, Gestão & Documentação*
+- **Aelton Soares de Menezes** (RM: 573694) - *Backend REST API, IA EVA & Frontend Web*
+- **Victor Mantovani** (RM: 570608) - *Machine Learning & Analytics*
+- **Michelly Santos** (RM: 573625) - *Sistema de Tarifação & Simulação de Pagamentos*
+- **Bruno Santos** (RM: 572073) - *Dashboard Administrativo, Gestão & Documentação*
 
 ---
 
@@ -60,7 +60,7 @@ A fonte oficial de dados da aplicação é o arquivo `backend/data/tratados/esta
   - **Faturamento Total:** `R$ 367.54`
   - **Total de Sessões:** `285 recargas concluídas`
 
-### 3.3. IA EVA — Assistente Virtual Inteligente
+### 3.3. IA EVA - Assistente Virtual Inteligente
 A **EVA** (*Energy Virtual Assistant*) foi desenvolvida com arquitetura de alta resiliência (*Dual Engine*):
 
 1. **Modo Conectado (OpenAI GPT-4o-mini):** Quando uma chave `OPENAI_API_KEY` válida é configurada no arquivo `.env`, as respostas são formuladas dinamicamente via LLM com injeção de contexto em tempo real;
