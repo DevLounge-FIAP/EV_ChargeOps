@@ -164,19 +164,41 @@ backend/
 
 *(Victor: adicione aqui os detalhes dos modelos desenvolvidos, algoritmos utilizados, gráficos de previsão e insights de demanda).*
 
+
 ---
+## 7. Módulo 3: Sistema de Tarifação e Simulação de Pagamentos (Michelly Santos)
 
-## 7. Módulo 3: Sistema de Tarifação e Simulação de Pagamentos (Michelly Lima)
+### 7.1 Regras de Negócio e Pagamentos
+*Arquivo billing_Servce.py (Motor de rateio e pagamentos) -> explicar oq cada função faz/métodos + regras de rateio +explicação do fluxo de pagamento + formulação matemática de tarifação, divisão de custos fixos vs energia e a documentação da simulação do checkout digital.
+O arquivo billing_service.py contém as funções necessárias para o cálculo dos custos, tarifas e pagamentos:
 
-> *Espaço reservado para documentação das regras de rateio e fluxo de pagamento de Michelly Lima.*
+- **Função calculate_tarifa_atual :** usa como base o horário atual para identificar se a tarifa deve ser o valor padrão ou se deve ser alterado para o valor das horas de pico. Note que para incentivar o carregamento fora do horário de pico encontrado, o cálculo da tarifa foi realizado para que a receita no fim do mês seja a mesma caso a tarifa fosse um valor fixo padrão independente do momento de carregamento. Para isso, foi adicionado um acréscimo sobre o valor padrão e, consequentemente, uma redução na tarifa das recargas fora do horário de pico.
 
-### Onde conectar seu código:
-- **Regras de Negócio & Pagamentos:** `backend/app/services/billing_service.py`
-  - Métodos já preparados: `calculate_rateio()`, `simulate_charge()` e `process_checkout_simulation()`.
-- **Rotas da API:** `backend/app/api/routes_billing.py`
-  - Endpoints já disponíveis: `POST /api/billing/calculate`, `POST /api/billing/simulate`, `POST /api/billing/checkout` e `GET /api/billing/config`.
+> Horário de pico: representa o momento em que a necessidade de enérgica aumenta para suprir o aumento da demanda. É calculado no arquivo ml_service.py (_horario_pico) que se baseia no horário real de início de cada sessão de recarga registrada pelo carregador GoodWe.
 
-*(Michelly: adicione aqui a formulação matemática de tarifação, divisão de custos fixos vs energia e a documentação da simulação do checkout digital).*
+> Tarifa padrão: custo de energia de R$0,82/kWh + custo de manutenção de R$0,13/kWh = R$0,95/kWh
+> Fator adicionado a tarifa padrão no horário de pico: 1.20
+
+> Fórmula para calcular a tarifa dinâmica:
+>   Receita padrão = Receita dinâmica
+>   energia total × tarifa padrão = energia fora pico × tarifa fora pico + energia pico × tarifa pico
+
+> A partir disso se obtém: 
+>   Tarifa dentro do horário de pico = R$0,95/kWh * 1.20 = R$1,14/kWh 
+>   Tarifa fora do horário de pico = R$0,70/kWh
+
+- **Função calculate_rateio :** recebe a tarifa atual, que varia de acordo com o horário e o valor da energia consumida e calcula o valor do rateio/fatura, indicando se houve aumento ou redução da tarifa base em decorrência do horário.
+- **Função simulate_charge :** se baseia na disponibilidade de energia no momento, nos dados do veículo e na tarifa de acordo com o momento para devolver uma resposta a solicitação do usuário de simulação de carregamento
+- **Função process_checkout_simulation :** gera um comprovante com dados da sessão de carregamento simulando um pagamento real.
+
+### 7.2 Rotas da API
+| Arquivo | routes_billing.py |
+| Rota | O que devolve |
+|---|---|
+| POST /api/billing/calculate | Cálculo da fatura pelo modelo de rateio 
+| POST /api/billing/simulate | Simulador paramétrico de recarga 
+| POST /api/billing/checkout | Simulação de checkout e autorização de recarga com recibo 
+| GET /api/billing/config | Retorna parâmetros tarifários do condomínio
 
 ---
 
