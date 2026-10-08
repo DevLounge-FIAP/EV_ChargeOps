@@ -7,6 +7,7 @@ from ..schemas.models import (
 )
 from ..services.billing_service import billing_service
 from ..services.data_service import data_service
+from typing import Optional
 
 router = APIRouter(prefix="/api/billing", tags=["Tarifação & Pagamentos (Michelly)"])
 
@@ -27,12 +28,11 @@ def simulate_charge(request: SimulationRequest):
     return billing_service.simulate_charge(request)
 
 @router.post("/checkout", summary="Simulação de checkout e autorização de recarga")
-def simulate_checkout(energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX"):
+def simulate_checkout(energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX", start_hour: Optional[int] = None):
     """
-    Ponto de conexão para Michelly:
     Simula autorização digital de pagamento e emissão de comprovante individualizado.
     """
-    return billing_service.process_checkout_simulation(energy_kwh=energy_kwh, unit=unit, payment_method=payment_method)
+    return billing_service.process_checkout_simulation(energy_kwh=energy_kwh, unit=unit, payment_method=payment_method, start_hour=start_hour)
 
 @router.get("/config", summary="Retorna parâmetros tarifários do condomínio")
 def get_billing_config():

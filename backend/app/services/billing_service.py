@@ -6,6 +6,8 @@ from ..schemas.models import (
     SimulationResponse
 )
 from .data_service import data_service
+from .ml_service import ml_service
+from datetime import datetime
 
 # Tempo de recarga calibrado com as 242 sessões reais do SEMS+ (R² 0,86, erro médio de 22 min):
 # tempo (h) = TEMPO_FIXO_H + TEMPO_POR_KWH_H x energia (kWh)
@@ -17,19 +19,35 @@ TEMPO_POR_KWH_H = 0.366
 KM_POR_KWH_PADRAO = 4.6
 
 class BillingService:
+    def calculate_tarifa_atual(hora=None):
+            """
+                Calcula a tarifa com base no horário atual
+            """
+            if hora is None: #se não receber um horário, utiliza o horário atual 
+                hora = datetime.now().hour
+            try:
+                tabela = ml_service.get_dynamic_pricing()["tabela_hora_inicio"]
+                return next(t["tarifa_brl_kwh"] for t in tabela if t["hora_inicio"] == hora)
+            except Exception:
+                return settings.DEFAULT_RATE_PER_KWH
+    
     def calculate_rateio(self, req: RateioCalculateRequest) -> RateioCalculateResponse:
         """
         Aplica a fórmula oficial do rateio EV ChargeOps:
         Valor da Fatura = Energia Consumida (kWh) × Valor Cobrado por kWh
         """
-        rate = req.rate_per_kwh if req.rate_per_kwh is not None else settings.DEFAULT_RATE_PER_KWH
+        rate = req.rate_per_kwh if req.rate_per_kwh is not None else self.calculate_tarifa_atual()
         total_amount = round(req.energy_kwh * rate, 2)
 
-        # Decomposição conceitual (energia base + cota de manutenção compartilhada)
-        metadata = data_service.get_condo_metadata()
-        tariff_info = metadata.get("condominium", {}).get("tariff", {})
-        base_rate = tariff_info.get("base_energy_cost_brl", 0.82)
-        maint_rate = tariff_info.get("maintenance_share_brl", 0.13)
+        base = settings.DEFAULT_RATE_PER_KWH
+        variacao_pct = round((rate - base) / base * 100, 2)
+
+        if variacao_pct > 0:
+            reason = f"Tarifa de horário de pico: + {variacao_pct}% sobre a tarifa base (R$ {base:.2f}/kWh)"
+        elif variacao_pct < 0:
+            reason = f"Tarifa de horário fora de pico: {variacao_pct}% sobre a tarifa base (R$ {base:.2f}/kWh)"
+        else:
+            reason = "Tarifa base aplicada"
 
         return RateioCalculateResponse(
             energy_kwh=round(req.energy_kwh, 2),
@@ -37,11 +55,12 @@ class BillingService:
             formula_applied="Valor = Energia (kWh) × R$ Rateio/kWh",
             total_amount_brl=total_amount,
             breakdown={
-                "base_energy_cost": round(req.energy_kwh * base_rate, 2),
-                "charger_maintenance_share": round(req.energy_kwh * maint_rate, 2)
-            }
+                "tarifa_base_brl_kwh": base,
+                "variacao_percentual": variacao_pct
+            },
+            rate_reason=reason
         )
-
+    
     def simulate_charge(self, sim: SimulationRequest) -> SimulationResponse:
         """
         Simula o carregamento relacionando:
@@ -53,7 +72,7 @@ class BillingService:
         cur_soc = 20.0 if sim.current_soc_percent is None else max(0.0, min(sim.current_soc_percent, 100.0))
         target_soc = 80.0 if sim.target_soc_percent is None else max(cur_soc, min(sim.target_soc_percent, 100.0))
         power = sim.charger_power_kw or 7.0
-        rate = sim.rate_per_kwh or settings.DEFAULT_RATE_PER_KWH
+        rate = sim.rate_per_kwh or self.calculate_tarifa_atual()
 
         # Volume necessário em kWh
         delta_percent = (target_soc - cur_soc) / 100.0
@@ -91,12 +110,11 @@ class BillingService:
             estimated_added_range_km=added_range_km
         )
 
-    def process_checkout_simulation(self, energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX"):
+    def process_checkout_simulation(self, energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX", start_hour: int = None):
         """
-        Ponto de conexão para Michelly: Simulação de checkout e confirmação de pagamento digital.
         Gera recibo de rateio atrelado à unidade do condômino.
         """
-        rate = settings.DEFAULT_RATE_PER_KWH
+        rate = self.calculate_tarifa_atual(start_hour)
         total = round(energy_kwh * rate, 2)
         import time
         return {
@@ -109,6 +127,8 @@ class BillingService:
             "payment_method": payment_method,
             "receipt_message": f"Pagamento simulado com sucesso para {unit}. Volume de {energy_kwh:.2f} kWh autorizado no GoodWe HCA G2."
         }
+
+
 
 billing_service = BillingService()
 
