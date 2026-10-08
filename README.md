@@ -192,7 +192,7 @@ O arquivo billing_service.py contém as funções necessárias para o cálculo d
 - **Função process_checkout_simulation :** gera um comprovante com dados da sessão de carregamento simulando um pagamento real.
 
 ### 7.2 Rotas da API
-| Arquivo | routes_billing.py |
+Arquivo -> routes_billing.py
 | Rota | O que devolve |
 |---|---|
 | POST /api/billing/calculate | Cálculo da fatura pelo modelo de rateio 
