@@ -32,17 +32,33 @@ Para garantir um protótipo com código 100% autoral, robusto e compatível com 
 
 | Decisão / Desvio | Motivação & Limitação Técnica | Solução Implementada |
 | :--- | :--- | :--- |
-| **Backend em Python/FastAPI (Substituição do n8n)** | Plataformas low-code ocultam regras de negócio, geram dependência externa e enfraquecem a comprovação de autoria exigida na FIAP. | API autoral em **FastAPI**, com rotas documentadas (`/docs`), validação via Pydantic e execução assíncrona de alta performance. |
+| **Backend autoral em Python/FastAPI, sem plataformas low-code** | Ferramentas low-code (como n8n) ocultam regras de negócio, geram dependência externa e enfraquecem a comprovação de autoria exigida na FIAP. A Sprint 01 já previa FastAPI, e a decisão foi mantida. | API autoral em **FastAPI**, com rotas documentadas (`/docs`), validação via Pydantic e execução assíncrona de alta performance. |
 | **Ingestão por exportação manual do SEMS+ (em vez de API)** | Conforme a apresentação da GoodWe, não há suporte de API para os EV Chargers (a consulta é do tipo *pull*, sem tempo real). O que foi liberado é o acesso à planta de monitoramento no SEMS+. | 13 relatórios mensais em **XLSX** (set/2025 a set/2026) e 2 **PDFs** com o registro de carregamento, tratados por scripts Python em `backend/scripts/data_scripts`. |
 | **Dados da estação em formato diário e agregado** | Os XLSX são o relatório diário da planta inteira. Não trazem sessão, usuário, veículo nem horário de uso. | `estacao_diario.csv` (395 dias x 13 indicadores) é usado como série de contexto. As sessões vêm do registro de carregamento do SEMS+. |
 | **Usuários e veículos simulados sobre sessões reais** | As sessões reais vêm de um único carregador e de um único cartão RFID. Não há dados de vários moradores nem do modelo do carro. | `gerar_sessoes_condominio.py` atribui cada sessão real a um de 5 usuários simulados, com 3 modelos do catálogo (Mercedes-Benz EQE 350+, BYD Seal e Volvo EX30), por sorteio com semente fixa (42). Horários, kWh e durações são reais. Usuário e veículo são simulados. |
-| **Persistência em CSV (tabelas) e JSON (metadados)** | Prototipação rápida com pandas, e dados tabulares são mais simples em CSV, sem necessidade de SGBD. | `estacao_diario.csv`, `sessoes_reais.csv`, `sessoes_condominio.csv` e `veiculos.csv` em `backend/data`. O JSON guarda os metadados do condomínio (`ev_chargeops_data.json`, com valores padrão no `data_service` quando o arquivo não existe). |
+| **Persistência em CSV (tabelas) e JSON (metadados) no lugar do PostgreSQL** | A Sprint 01 previa PostgreSQL. O volume do protótipo é pequeno (242 sessões, 5 usuários) e os dados são somente leitura, então um SGBD acrescentaria instalação sem ganho na demonstração. | `estacao_diario.csv`, `sessoes_reais.csv`, `sessoes_condominio.csv` e `veiculos.csv` em `backend/data`. O JSON guarda os metadados do condomínio (`ev_chargeops_data.json`, com valores padrão no `data_service` quando o arquivo não existe). |
 | **Tarifa como parâmetro do sistema** | Os valores em R$ dos XLSX usam uma tarifa fixa de R$ 1,00 por kWh, que não representa uma tarifa real. | `DEFAULT_RATE_PER_KWH` em `config.py` (R$ 0,95, configurável por `.env`). Valor provisório, a confirmar com o grupo. |
 | **Potência e tempo de recarga calibrados com dados reais** | O carregador de referência é de 7 kW, mas nas sessões reais a potência média foi de cerca de 2,1 kW. Usar a potência nominal subestima o tempo de recarga em cerca de 3 vezes. | O simulador usa uma relação calibrada nas 242 sessões reais: tempo (h) = 0,94 + 0,366 x kWh (R² 0,86, erro médio de 22 minutos), com a potência nominal como piso físico. |
-| **IA EVA com RAG em Memória / Context Injection** | Garantir respostas precisas sobre faturas e baterias sem risco de alucinação e com alta velocidade de resposta. | Injeção dinâmica do perfil do morador, veículo cadastrado, tarifa e histórico das sessões diretamente no prompt da IA. |
+| **IA EVA com injeção de contexto no lugar de RAG com LangChain** | Ver seção 2.1. | Injeção dinâmica do perfil do morador, veículo cadastrado, tarifa e histórico das sessões diretamente no prompt da IA. |
 | **Descontinuação da conexão direta aos carregadores** | Restrições logísticas de rede local e segurança no Energy Innovation Lab da FIAP (Estacionamento L1). | O controle e a simulação das sessões operam sobre o fluxo de dados coletados, desacoplados do acionamento físico. |
 | **Substituição de RFID / Bluetooth por simulação lógica de sessão e checkout** | Limitações de disponibilidade de hardware dedicado (leitores e tags) e complexidade de integração embarcada na fase atual. | Identificação do usuário, autorização de recarga e checkout simulados via interface web integrada à API. |
-| **Dashboard em código, sem ferramenta de BI** | Mesmo motivo da troca do n8n: manter a regra de negócio no código do grupo. | Dashboard em FastAPI + Chart.js (ver seção 8.5). |
+| **Dashboard em código, sem ferramenta de BI** | Mesmo motivo da escolha por código autoral: manter a regra de negócio no código do grupo. | Dashboard em FastAPI + Chart.js (ver seção 8.5). |
+| **Frontend em HTML, CSS e JavaScript no lugar de React e React Native** | A Sprint 01 previa React (gestor) e React Native (morador). Um frontend sem build, servido pelo próprio FastAPI, roda em um único processo e sem Node.js. | Aplicação web responsiva em `frontend/`, com as abas do morador e do gestor na mesma página. Não há app mobile nativo. |
+| **Pagamento simulado no lugar de gateway (Stripe ou PIX)** | Integração real exige conta, credenciais e homologação, fora do escopo do protótipo. | `POST /api/billing/checkout` gera um comprovante simulado com a tarifa do horário. O botão de autorização do simulador chama essa rota. |
+| **Login, notificações e acessibilidade não implementados** | Dependem de banco de dados e cadastro, de um canal de envio e de tempo que foi priorizado para rateio e IA. | Ficam como evolução. |
+
+### 2.1. Desvios do Módulo de Inteligência Artificial
+
+A Sprint 01 definiu duas IAs: a **IA de Controle Operacional** (previsão de consumo por regressão, estimativa de tempo restante e detecção de anomalias) e a **IA EVA** (RAG sobre uma base de conhecimento fechada).
+
+| Plano da Sprint 01 | O que foi implementado | Justificativa |
+| :--- | :--- | :--- |
+| **Previsão de consumo por regressão (scikit-learn)** | Previsão diária por **mediana de kWh por dia da semana**, validada por data (seção 6.3). | As sessões trazem só data, hora, duração e kWh, de um único cartão RFID. Sem outras variáveis explicativas, o único sinal é o calendário, e a demanda é intermitente. Nesse cenário a mediana teve o menor erro entre as seis variantes testadas, então o grupo optou por um modelo simples e explicável. |
+| **Previsão da fatura mensal de cada usuário** | Não implementada. A previsão é do total diário da estação. | Os usuários são simulados por sorteio sobre as sessões de um único cartão. O histórico por usuário não tem padrão próprio para ser aprendido. |
+| **IA alimentando o motor de rateio** | **Implementado.** A precificação dinâmica (seção 6.4) aprende a janela de pico com as sessões reais e define a tarifa por horário que o `billing_service` usa em `/calculate`, `/simulate` e `/checkout`. | É o papel estrutural da IA no fluxo: a saída do modelo define o valor por kWh da fórmula `Fatura = kWh x Tarifa`. |
+| **Estimativa do tempo restante de carga** | Relação calibrada nas sessões reais (tempo = 0,94 + 0,366 x kWh), usada no simulador. | Não há telemetria em tempo real, então a estimativa é feita antes da sessão, a partir da energia desejada. |
+| **Detecção de anomalias** | **Não implementada.** A qualidade dos dados é tratada por regras fixas na extração (sessões abaixo de 0,5 kWh e as 6 sessões sem cartão ficam de fora, seção 10.3). | A exportação do SEMS+ não traz eventos de erro, interrupção ou falha do equipamento. Com um único carro e sem anomalias confirmadas, não haveria como validar um detector. Fica como evolução quando houver telemetria por sessão. |
+| **EVA com RAG (LangChain) sobre manual do HCA G2, regulamento interno e documentação do rateio** | Injeção de contexto no prompt (seção 3.3), com fallback para um motor de regras sem chave da OpenAI. | O regulamento interno não existe (o condomínio é simulado) e o conteúdo necessário cabe inteiro no prompt, então não há o que recuperar por busca vetorial. A injeção de contexto restringe as respostas aos dados da plataforma sem depender de LangChain e de banco vetorial. |
 
 ---
 
@@ -213,7 +229,7 @@ flowchart TD
     DASH --> FRONT
 ```
 
-> O diagrama `imagens/diagrama_arquitetura.png` é o fluxo planejado na Sprint 01. Em relação a ele, a Sprint 02 não usa banco de dados (os dados ficam em CSV e JSON) e não implementou a detecção de anomalias.
+> O diagrama `imagens/diagrama_arquitetura.png` é o fluxo planejado na Sprint 01. Em relação a ele, a Sprint 02 não usa banco de dados (os dados ficam em CSV e JSON) e não implementou a detecção de anomalias (justificativas na seção 2).
 
 ---
 
@@ -469,7 +485,7 @@ Respostas obtidas com a API rodando sobre as 242 sessões do condomínio.
 }
 ```
 
-`POST /api/billing/simulate` com bateria de 69 kWh, de 20% a 80%
+`POST /api/billing/simulate` com bateria de 69 kWh, de 20% a 80% e tarifa base informada (`rate_per_kwh: 0.95`). Sem esse campo, a API aplica a tarifa do horário atual (R$ 1,14 no pico ou R$ 0,70 fora dele), então o custo varia conforme a hora da chamada.
 ```json
 {
   "energy_needed_kwh": 41.4,
@@ -477,6 +493,20 @@ Respostas obtidas com a API rodando sobre as 242 sessões do condomínio.
   "estimated_time_formatted": "16h 05min",
   "total_cost_brl": 39.33,
   "estimated_added_range_km": 190.4
+}
+```
+
+`POST /api/billing/checkout?energy_kwh=10&unit=Apto 42B&payment_method=PIX&start_hour=20` (sessão iniciada no pico). Com `start_hour=10`, a mesma recarga sai a R$ 0,70/kWh, total de R$ 7,00.
+```json
+{
+  "status": "approved",
+  "transaction_id": "PAY-1791587197",
+  "unit": "Apto 42B",
+  "energy_kwh": 10.0,
+  "rate_per_kwh": 1.14,
+  "total_amount_brl": 11.4,
+  "payment_method": "PIX",
+  "receipt_message": "Pagamento simulado com sucesso para Apto 42B. Volume de 10.00 kWh autorizado no GoodWe HCA G2."
 }
 ```
 
@@ -567,13 +597,14 @@ Cartões de métricas, gráficos, carregadores e histórico de pagamentos:
 - O catálogo de veículos tem uma inconsistência de convenção: o consumo oficial do Inmetro (MJ/km) e a conta capacidade ÷ autonomia não coincidem (a segunda dá um consumo de 26% a 41% maior). O simulador usa capacidade ÷ autonomia.
 - A potência de carga em corrente alternada dos carros não foi incluída, porque o carregador de referência limita a recarga.
 - Autorização de recarga e checkout são simulados. Não há integração com o hardware do carregador nem com meio de pagamento real.
+- As 242 sessões históricas e o faturamento do dashboard (R$ 1.788,84) estão calculados com a tarifa base de R$ 0,95/kWh. A tarifa dinâmica vale para os cálculos novos (`/calculate`, `/simulate` e `/checkout`). Com o mesmo padrão de horário, as duas dão a mesma receita total.
+- O motor de regras da EVA (modo sem chave da OpenAI) ainda usa a tarifa base e 7,4 kW nas estimativas, e não a tarifa dinâmica nem o tempo calibrado do simulador.
 - Não há banco de dados, login ou gestão de credenciais.
 
 ### 10.5 Pendências em aberto
 
 - Confirmar no SEMS+ o modelo do carregador do laboratório (a apresentação da GoodWe indica o GW7K-HCA-20, de 7 kW) e a corrente configurada. O código usa 7,4 kW na EVA e 7 kW no simulador;
 - Definir a tarifa final do condomínio (hoje R$ 0,95/kWh, provisória);
-- Decidir a convenção de consumo dos veículos;
 - Esclarecer o que a coluna `energia_carregada_kwh` mede (baixa prioridade);
 - Verificar se o consumo diário da planta inclui a energia do carregador.
 

@@ -64,7 +64,7 @@
             <div class="kpi-card" id="kpi-charger">
                 <div class="kpi-content">
                     <span class="kpi-title">Carregador GoodWe</span>
-                    <h3 class="kpi-value text-accent">HCA G2 (7.4 kW)</h3>
+                    <h3 class="kpi-value text-accent">HCA G2 (7 kW)</h3>
                     <span class="kpi-meta status-online-text">&bull; Operacional (FIAP L1)</span>
                 </div>
             </div>
@@ -73,7 +73,7 @@
                 <div class="kpi-content">
                     <span class="kpi-title">Tarifa por kWh</span>
                     <h3 class="kpi-value" id="kpi-current-rate">R$ 0,95</h3>
-                    <span class="kpi-meta">Energia + Manutencao</span>
+                    <span class="kpi-meta">Tarifa base (varia por horario de inicio)</span>
                 </div>
             </div>
         </section>
@@ -197,8 +197,8 @@
 
                         <div class="control-group">
                             <label for="sim-power">Potencia do Carregador (kW):</label>
-                            <input type="number" id="sim-power" value="7.4" readonly class="custom-input readonly-input">
-                            <span class="input-hint">GoodWe HCA G2 (7.4 kW / 220V 32A Monofasico)</span>
+                            <input type="number" id="sim-power" value="7.0" readonly class="custom-input readonly-input">
+                            <span class="input-hint">GoodWe GW7K-HCA-20 (7 kW nominal, usado como piso fisico do tempo)</span>
                         </div>
 
                         <button id="btn-run-simulation" class="action-btn">
@@ -221,13 +221,13 @@
                             <div class="result-box">
                                 <span class="res-label">Tempo Estimado de Carga</span>
                                 <h3 class="res-value" id="res-time">--</h3>
-                                <span class="res-sub">Eficiencia de 92%</span>
+                                <span class="res-sub">Calibrado nas sessoes reais</span>
                             </div>
 
                             <div class="result-box highlight-box">
                                 <span class="res-label">Custo Estimado da Recarga</span>
                                 <h3 class="res-value text-green" id="res-cost">R$ --</h3>
-                                <span class="res-sub" id="res-rate-label">R$ 0,95 / kWh</span>
+                                <span class="res-sub" id="res-rate-label">Tarifa do horario atual</span>
                             </div>
 
                             <div class="result-box">
@@ -241,11 +241,11 @@
                         <div class="breakdown-box">
                             <h4 class="breakdown-title">Detalhamento Transparente do Valor:</h4>
                             <div class="breakdown-row">
-                                <span>Energia Efetiva (R$ 0,82/kWh):</span>
+                                <span>Energia Efetiva (86% da tarifa):</span>
                                 <strong id="res-base-energy">R$ --</strong>
                             </div>
                             <div class="breakdown-row">
-                                <span>Quota de Manutencao do Carregador (R$ 0,13/kWh):</span>
+                                <span>Quota de Manutencao do Carregador (14% da tarifa):</span>
                                 <strong id="res-maintenance">R$ --</strong>
                             </div>
                         </div>
@@ -255,7 +255,7 @@
                             <button id="btn-simulate-payment" class="pay-btn">
                                 <span>Simular Autorizacao & Rateio</span>
                             </button>
-                            <p class="payment-note" id="payment-status-msg">Integracao com a formula de faturamento individualizado.</p>
+                            <p class="payment-note" id="payment-status-msg">Gera o comprovante pela API de tarifacao (/api/billing/checkout).</p>
                         </div>
                     </div>
                 </div>

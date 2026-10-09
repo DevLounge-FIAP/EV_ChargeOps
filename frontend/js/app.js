@@ -11,7 +11,8 @@ const API_BASE_URL = (window.location.protocol === "http:" || window.location.pr
 const state = {
     unit: "Apto 42B",
     chatHistory: [],
-    apiOnline: false
+    apiOnline: false,
+    lastSimulation: null
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -273,22 +274,59 @@ function initSimulator() {
 
     btnSimulate.addEventListener("click", runSimulation);
 
-    btnPay.addEventListener("click", () => {
-        const cost = document.getElementById("res-cost").textContent;
-        const kwh = document.getElementById("res-kwh").textContent;
-        const msg = document.getElementById("payment-status-msg");
-        msg.innerHTML = `<strong>Autorizacao confirmada.</strong> Fatura estimada em <strong>${cost}</strong> para o volume de <strong>${kwh}</strong> vinculada a unidade <strong>${state.unit}</strong>.`;
+    btnPay.addEventListener("click", runCheckout);
+}
+
+// Tarifa base e decomposicao (energia 0,82 + manutencao 0,13 = 0,95), usadas so no modo offline
+const TARIFA_BASE_OFFLINE = 0.95;
+const PARCELA_ENERGIA = 0.82 / 0.95;
+const PARCELA_MANUTENCAO = 0.13 / 0.95;
+
+async function runCheckout() {
+    const msg = document.getElementById("payment-status-msg");
+    const sim = state.lastSimulation;
+
+    if (!sim || sim.energy_needed_kwh <= 0) {
+        msg.textContent = "Calcule uma simulacao com energia maior que zero antes de autorizar.";
+        msg.style.color = "var(--accent-amber)";
+        return;
+    }
+
+    if (!state.apiOnline) {
+        msg.textContent = "API offline: nao e possivel gerar o comprovante. Inicie o backend e tente novamente.";
+        msg.style.color = "var(--accent-amber)";
+        return;
+    }
+
+    try {
+        const params = new URLSearchParams({
+            energy_kwh: sim.energy_needed_kwh,
+            unit: state.unit,
+            payment_method: "PIX"
+        });
+        const res = await fetch(`${API_BASE_URL}/api/billing/checkout?${params}`, { method: "POST" });
+        if (!res.ok) throw new Error();
+
+        const r = await res.json();
+        const valor = r.total_amount_brl.toFixed(2).replace('.', ',');
+        const tarifa = r.rate_per_kwh.toFixed(2).replace('.', ',');
+        msg.innerHTML = `<strong>Autorizacao confirmada (${r.transaction_id}).</strong> ${r.energy_kwh.toFixed(2).replace('.', ',')} kWh x R$ ${tarifa}/kWh = <strong>R$ ${valor}</strong> via ${r.payment_method}, vinculado a <strong>${r.unit}</strong>.`;
         msg.style.color = "var(--accent-green)";
-    });
+    } catch (e) {
+        msg.textContent = "Falha ao processar o checkout na API de tarifacao.";
+        msg.style.color = "var(--accent-amber)";
+    }
 }
 
 async function runSimulation() {
     const battery = parseFloat(document.getElementById("sim-battery").value) || 40.0;
     const curSoc = parseFloat(document.getElementById("sim-current-soc").value) || 0;
     const targetSoc = parseFloat(document.getElementById("sim-target-soc").value) || 0;
+    const power = parseFloat(document.getElementById("sim-power").value) || 7.0;
 
     try {
         if (state.apiOnline) {
+            // Sem rate_per_kwh: a API aplica a tarifa dinamica do horario atual
             const res = await fetch(`${API_BASE_URL}/api/billing/simulate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -296,14 +334,13 @@ async function runSimulation() {
                     vehicle_battery_kwh: battery,
                     current_soc_percent: curSoc,
                     target_soc_percent: targetSoc,
-                    charger_power_kw: 7.4,
-                    rate_per_kwh: 0.95
+                    charger_power_kw: power
                 })
             });
 
             if (res.ok) {
                 const data = await res.json();
-                updateSimulationUI(data);
+                updateSimulationUI(data, false);
                 return;
             }
         }
@@ -311,32 +348,44 @@ async function runSimulation() {
         // Fallback matemático local
     }
 
+    // Mesma relacao calibrada do billing_service: tempo (h) = 0,94 + 0,366 x kWh, com piso na potencia nominal
     const delta = Math.max(0, (targetSoc - curSoc) / 100.0);
     const neededKwh = battery * delta;
-    const timeHours = neededKwh / (7.4 * 0.92);
+    const timeHours = neededKwh > 0 ? Math.max(0.94 + 0.366 * neededKwh, neededKwh / power) : 0;
     const totalMins = Math.round(timeHours * 60);
     const h = Math.floor(totalMins / 60);
     const m = totalMins % 60;
-    const cost = neededKwh * 0.95;
 
     updateSimulationUI({
         energy_needed_kwh: neededKwh,
         estimated_time_formatted: `${h}h ${m < 10 ? '0' : ''}${m}min`,
-        total_cost_brl: cost,
-        estimated_added_range_km: neededKwh * 6.8
-    });
+        total_cost_brl: neededKwh * TARIFA_BASE_OFFLINE,
+        estimated_added_range_km: neededKwh * 4.6
+    }, true);
 }
 
-function updateSimulationUI(data) {
+function updateSimulationUI(data, offline) {
+    state.lastSimulation = data;
+
     document.getElementById("res-kwh").textContent = `${data.energy_needed_kwh.toFixed(2).replace('.', ',')} kWh`;
     document.getElementById("res-time").textContent = data.estimated_time_formatted;
     document.getElementById("res-cost").textContent = `R$ ${data.total_cost_brl.toFixed(2).replace('.', ',')}`;
     document.getElementById("res-range").textContent = `+${Math.round(data.estimated_added_range_km)} km`;
 
-    const baseEnergy = (data.energy_needed_kwh * 0.82).toFixed(2).replace('.', ',');
-    const maint = (data.energy_needed_kwh * 0.13).toFixed(2).replace('.', ',');
+    // Tarifa efetiva aplicada pela API (custo / energia)
+    const rateLabel = document.getElementById("res-rate-label");
+    if (data.energy_needed_kwh > 0) {
+        const rate = (data.total_cost_brl / data.energy_needed_kwh).toFixed(2).replace('.', ',');
+        rateLabel.textContent = offline ? `R$ ${rate} / kWh (tarifa base, offline)` : `R$ ${rate} / kWh (tarifa do horario atual)`;
+    }
+
+    const baseEnergy = (data.total_cost_brl * PARCELA_ENERGIA).toFixed(2).replace('.', ',');
+    const maint = (data.total_cost_brl * PARCELA_MANUTENCAO).toFixed(2).replace('.', ',');
     document.getElementById("res-base-energy").textContent = `R$ ${baseEnergy}`;
     document.getElementById("res-maintenance").textContent = `R$ ${maint}`;
+
+    document.getElementById("payment-status-msg").textContent = "Gera o comprovante pela API de tarifacao (/api/billing/checkout).";
+    document.getElementById("payment-status-msg").style.color = "";
 }
 
 // ==========================================================================
