@@ -56,8 +56,10 @@ A Sprint 01 definiu duas IAs: a **IA de Controle Operacional** (previsão de con
     2. *"Quantos kWh faltam para completar a carga?"*
     3. *"Qual será o custo estimado da recarga?"*
     4. *"Como funciona o modelo de rateio por kWh?"*
+    5. *"Qual o melhor horário para carregar?"*
+    6. *"Por que minha fatura subiu este mês?"*
   - Endpoints dedicados para o frontend e integração com as saídas de Machine Learning e Tarifação.
-* **Limitação conhecida:** o motor de regras da EVA (modo sem chave da OpenAI) ainda usa a tarifa base de R$ 0,95 e a potência de 7,4 kW nas estimativas, e não a tarifa dinâmica nem o tempo calibrado do simulador.
+  - Integração da EVA com os outros módulos: as estimativas de tempo e custo usam o simulador do `billing_service`, as respostas sobre horário usam a precificação dinâmica do `ml_service`, e o prompt do Modo Conectado recebe também o consumo mensal do morador e a previsão de demanda. Consultas adicionais: *"Qual o melhor horário para carregar?"* e *"Por que minha fatura subiu este mês?"*.
 ---
  
 ### 2.2. Machine Learning & Analytics - Predição e Consumo
@@ -83,10 +85,9 @@ A Sprint 01 definiu duas IAs: a **IA de Controle Operacional** (previsão de con
   - Fórmula oficial do rateio, `Fatura = kWh x Tarifa`, com a tarifa do horário vinda da precificação dinâmica (`calculate_tarifa_atual` e `calculate_rateio`).
   - Simulação da recarga a partir da capacidade da bateria e do nível atual e desejado de carga, com energia, tempo, custo e autonomia adicionada (`simulate_charge`).
   - Exibição transparente do custo, com a decomposição da tarifa em energia efetiva (R$ 0,82 de R$ 0,95, cerca de 86%) e quota de manutenção do carregador (R$ 0,13, cerca de 14%), aplicada proporcionalmente à tarifa do horário.
-  - Simulação de checkout com comprovante (`process_checkout_simulation`), chamada pelo botão de autorização do simulador.
+  - Simulação de checkout com comprovante (`process_checkout_simulation`), chamada pelo botão de autorização do simulador. A rota valida a energia (maior que zero) e a hora de início (0 a 23).
 * **Não implementado:**
   - Escolha direta por tempo de carregamento ou por volume de kWh: o simulador parte do nível de carga (%) e calcula energia e tempo.
-  - Integração da EVA com o simulador de tarifação (ver limitação na seção 2.1).
 ---
  
 ### 2.4. Interface do Usuário (Frontend Web)
@@ -226,7 +227,7 @@ Base: as 242 sessões de `sessoes_condominio.csv`, a mesma usada pelo backend e 
  
 ## 8. Pendências Abertas
  
-- Confirmar no SEMS+ o modelo do carregador do laboratório (a apresentação da GoodWe indica o GW7K-HCA-20, de 7 kW) e a corrente configurada. O simulador usa 7 kW; a EVA e os metadados do carregador ainda usam 7,4 kW.
+- Confirmar no SEMS+ o modelo do carregador do laboratório (a apresentação da GoodWe indica o GW7K-HCA-20, de 7 kW) e a corrente configurada. O código usa 7 kW no simulador, na EVA e nos metadados do carregador.
 - Definir a tarifa final do condomínio (hoje R$ 0,95/kWh).
 - Esclarecer o que a coluna `energia_carregada_kwh` mede (baixa prioridade).
 - Verificar se o consumo diário da planta inclui a energia do carregador.

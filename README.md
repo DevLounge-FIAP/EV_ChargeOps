@@ -10,6 +10,8 @@
 - **Michelly Santos** (RM: 573625) - *Sistema de Tarifação & Simulação de Pagamentos*
 - **Bruno Santos** (RM: 572073) - *Dashboard Administrativo, Gestão & Documentação*
 
+> Maria (RM 572267) participou da Sprint 01 e não integra a equipe na Sprint 02.
+
 ---
 
 ## 1. Visão Geral da Solução
@@ -95,9 +97,13 @@ A **EVA** (*Energy Virtual Assistant*) foi desenvolvida com arquitetura de alta 
 
 **Consultas Obrigatórias Suportadas em Linguagem Natural:**
 - *“Quantas horas o carro aguenta com a bateria atual?”* → Calcula a autonomia estimada com base na capacidade da bateria do veículo cadastrado (ex: 82,5 kWh do BYD Seal);
-- *“Quantos kWh faltam para completar a carga?”* → Calcula o volume em kWh e o tempo estimado de conexão no GoodWe HCA G2 (7.4 kW / eficiência de 92%);
-- *“Qual será o custo estimado da recarga?”* → Aplica a fórmula oficial de rateio ao volume da recarga;
-- *“Como funciona o modelo de rateio por kWh?”* → Explica os pilares da cobrança individualizada.
+- *“Quantos kWh faltam para completar a carga?”* → Calcula o volume em kWh, o tempo e o custo pelo simulador calibrado do `billing_service` (o mesmo da aba Simulador);
+- *“Qual será o custo estimado da recarga?”* → Aplica a fórmula oficial de rateio com a tarifa do horário atual e compara o custo no pico e fora dele;
+- *“Como funciona o modelo de rateio por kWh?”* → Explica os pilares da cobrança individualizada e a tarifa por horário;
+- *“Qual o melhor horário para carregar?”* → Responde com a janela de pico e as tarifas calculadas pelo `ml_service` (precificação dinâmica);
+- *“Por que minha fatura subiu este mês?”* → Compara os dois últimos meses com recargas do morador (sessões, kWh e valor).
+
+No Modo Conectado, o prompt da EVA recebe os mesmos dados: perfil e veículo do morador, consumo dos últimos meses, tarifas de pico e fora do pico, tarifa vigente e a previsão de demanda dos próximos 7 dias.
 
 ### 3.4. Frontend Web Centralizador (`/frontend`)
 Aplicação Web responsiva desenvolvida em **HTML5**, **CSS3 (Vanilla)** e **JavaScript modular**, sem frameworks externos pesados:
@@ -449,7 +455,7 @@ python run.py
 Testes automáticos (dentro da pasta `backend`, com o ambiente virtual ativo):
 
 ```bash
-pip install pytest
+pip install pytest httpx
 python -m pytest tests -v
 ```
 
@@ -465,7 +471,7 @@ Execução de `python -m pytest tests -q` na pasta `backend` (09/10/2026):
 
 ```
 ........                                                                 [100%]
-8 passed
+16 passed
 ```
 
 ### 9.2 Respostas reais da API
@@ -534,13 +540,13 @@ Capturas de tela da aplicação, com a API rodando em `http://localhost:8000`.
 
 #### IA EVA
 
-Chat com a EVA respondendo em linguagem natural à pergunta "Quantas horas o carro aguenta com a bateria atual?", com base na bateria do veículo cadastrado (BYD Seal, 82,5 kWh):
+Chat com a EVA respondendo à pergunta "Qual o melhor horário para carregar?" com a janela de pico e as tarifas calculadas pelo módulo de ML (precificação dinâmica):
 
 ![Chat com a IA EVA](imagens/Assistente%20Eva.png)
 
 #### Simulador de Recarga e Rateio
 
-Simulação paramétrica com bateria de 44,9 kWh, de 13% a 68% de carga: energia necessária, tempo estimado, custo pela fórmula `Fatura = kWh x Tarifa` (R$ 0,95/kWh), decomposição entre energia efetiva e quota de manutenção e autorização simulada:
+Simulação paramétrica com bateria de 44,9 kWh, de 13% a 68% de carga: energia necessária, tempo estimado, custo pela fórmula `Fatura = kWh x Tarifa` com a tarifa do horário (R$ 1,14/kWh, pico), decomposição entre energia efetiva e quota de manutenção e comprovante gerado pelo `/api/billing/checkout`:
 
 ![Simulador de recarga e rateio](imagens/Simulador%20e%20Rateio.png)
 
@@ -598,12 +604,11 @@ Cartões de métricas, gráficos, carregadores e histórico de pagamentos:
 - A potência de carga em corrente alternada dos carros não foi incluída, porque o carregador de referência limita a recarga.
 - Autorização de recarga e checkout são simulados. Não há integração com o hardware do carregador nem com meio de pagamento real.
 - As 242 sessões históricas e o faturamento do dashboard (R$ 1.788,84) estão calculados com a tarifa base de R$ 0,95/kWh. A tarifa dinâmica vale para os cálculos novos (`/calculate`, `/simulate` e `/checkout`). Com o mesmo padrão de horário, as duas dão a mesma receita total.
-- O motor de regras da EVA (modo sem chave da OpenAI) ainda usa a tarifa base e 7,4 kW nas estimativas, e não a tarifa dinâmica nem o tempo calibrado do simulador.
 - Não há banco de dados, login ou gestão de credenciais.
 
 ### 10.5 Pendências em aberto
 
-- Confirmar no SEMS+ o modelo do carregador do laboratório (a apresentação da GoodWe indica o GW7K-HCA-20, de 7 kW) e a corrente configurada. O código usa 7,4 kW na EVA e 7 kW no simulador;
+- Confirmar no SEMS+ o modelo do carregador do laboratório (a apresentação da GoodWe indica o GW7K-HCA-20, de 7 kW) e a corrente configurada. O código usa 7 kW (simulador, EVA e metadados do carregador);
 - Definir a tarifa final do condomínio (hoje R$ 0,95/kWh, provisória);
 - Esclarecer o que a coluna `energia_carregada_kwh` mede (baixa prioridade);
 - Verificar se o consumo diário da planta inclui a energia do carregador.
@@ -620,3 +625,51 @@ Os documentos de apoio ficam na pasta `docs/`:
 | `exigencias_sprint2.md` | Guia e rubrica de avaliação da Sprint 02 |
 | `Definição do trabalho.pdf` | Definição do desafio |
 | `Frente_1_Contexto_e_Mercado_rev.docx`, `Frente 2 - Mapeamento APIs Complementares (1).docx`, `Frente 3 - Camadas e Fluxos de Dados.docx`, `Frente 4.pdf` | Entregas da Sprint 01 |
+
+---
+
+## 12. Referências Bibliográficas
+
+**Referências da Sprint 01:**
+
+ANEEL, Agência Nacional de Energia Elétrica. **Resolução Normativa nº 1.000, de 7 de dezembro de 2021.** Estabelece as Regras de Prestação do Serviço Público de Distribuição de Energia Elétrica. Disponível em: https://www.aneel.gov.br
+
+BRASIL. **Lei nº 14.300, de 6 de janeiro de 2022.** Institui o marco legal da microgeração e minigeração distribuída, o Sistema de Compensação de Energia Elétrica (SCEE) e o Programa de Energia Renovável Social (PERS). Disponível em: https://www.planalto.gov.br
+
+BRASIL. **Lei Estadual nº 18.403, de 2026 (São Paulo).** Disciplina o direito de condôminos à instalação de infraestrutura de recarga de veículos elétricos em vagas de uso privativo.
+
+ABVE, Associação Brasileira do Veículo Elétrico. **Estatísticas de emplacamentos de veículos elétricos, 2024.** Disponível em: https://www.abve.org.br
+
+ANEEL. **Portal de Dados Abertos, Relação de Empreendimentos de Mini e Micro Geração Distribuída (MMGD).** Disponível em: https://dadosabertos.aneel.gov.br
+
+GOODWE. **Manual Técnico do Carregador Residencial CA, Série HCA G2.** Especificações técnicas, interfaces de hardware e parâmetros de operação.
+
+GOODWE. **SEMS Portal, Documentação de APIs.** Disponível em: https://semsplus.goodwe.com/
+
+GOOGLE. **Places API (New), Documentação do campo evChargeOptions.** Disponível em: https://developers.google.com/maps/documentation/places
+
+OPEN CHARGE MAP. **API REST, Documentação de endpoints.** Disponível em: https://openchargemap.org/site/develop
+
+FIAP; GOODWE. **Edital Enterprise Challenge 2026, GOODWE + FIAP.** Documento orientador, rubrica de avaliação e requisitos de entrega. São Paulo, 2026.
+
+ZAPTEC. **Documentação técnica do Zaptec Pro.** Disponível em: https://www.zaptec.com
+
+WALLBOX. **Documentação técnica do Pulsar Plus e Pulsar Pro.** Disponível em: https://wallbox.com
+
+CHARGEPOINT. **Relatório financeiro e documentação do modelo CPaaS, 3º trimestre fiscal 2025.** Disponível em: https://www.chargepoint.com
+
+COPEL TELECOM. **Rede de eletropostos, Documentação operacional e Lex Mobility.** Disponível em: https://www.copel.com
+
+**Referências técnicas da Sprint 02:**
+
+INMETRO. **Programa Brasileiro de Etiquetagem Veicular (PBE Veicular), tabela de consumo e autonomia de veículos elétricos.** Fonte da bateria, autonomia e consumo de `veiculos.csv`. Disponível em: https://www.gov.br/inmetro
+
+FASTAPI. **Documentação oficial.** Disponível em: https://fastapi.tiangolo.com
+
+PANDAS. **Documentação oficial.** Disponível em: https://pandas.pydata.org/docs
+
+CHART.JS. **Documentação da versão 4.4.1.** Disponível em: https://www.chartjs.org/docs
+
+OPENAI. **Chat Completions API.** Disponível em: https://platform.openai.com/docs
+
+IEC. **IEC 61851-1 (sistemas de recarga condutiva de veículos elétricos) e IEC 62196-2 (conector Tipo 2).**

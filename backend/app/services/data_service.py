@@ -168,7 +168,7 @@ class DataService:
                 "partner_lab": "FIAP Energy Innovation Lab - Estacionamento L1",
                 "charger": {
                     "model": "GoodWe HCA G2",
-                    "power_rating_kw": 7.4,
+                    "power_rating_kw": 7.0,
                     "connector_type": "Tipo 2 (IEC 62196-2)",
                     "protocol": "IEC 61851 / Control Pilot",
                     "status": "operational"

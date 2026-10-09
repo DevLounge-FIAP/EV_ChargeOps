@@ -28,5 +28,7 @@ def get_suggested_questions():
         {"id": "q2", "text": "Quantos kWh faltam para completar a carga?"},
         {"id": "q3", "text": "Qual será o custo estimado da recarga?"},
         {"id": "q4", "text": "Como funciona o modelo de rateio por kWh?"},
-        {"id": "q5", "text": "Quais são as especificações do carregador GoodWe HCA G2?"}
+        {"id": "q5", "text": "Quais são as especificações do carregador GoodWe HCA G2?"},
+        {"id": "q6", "text": "Qual o melhor horário para carregar?"},
+        {"id": "q7", "text": "Por que minha fatura subiu este mês?"}
     ]

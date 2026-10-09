@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from ..schemas.models import (
     RateioCalculateRequest,
     RateioCalculateResponse,
@@ -28,7 +28,12 @@ def simulate_charge(request: SimulationRequest):
     return billing_service.simulate_charge(request)
 
 @router.post("/checkout", summary="Simulação de checkout e autorização de recarga")
-def simulate_checkout(energy_kwh: float, unit: str = "Apto 42B", payment_method: str = "PIX", start_hour: Optional[int] = None):
+def simulate_checkout(
+    energy_kwh: float = Query(..., gt=0, description="Energia da recarga em kWh (maior que zero)"),
+    unit: str = "Apto 42B",
+    payment_method: str = "PIX",
+    start_hour: Optional[int] = Query(None, ge=0, le=23, description="Hora de início da sessão (0 a 23). Vazio usa a hora atual"),
+):
     """
     Simula autorização digital de pagamento e emissão de comprovante individualizado.
     """
