@@ -20,7 +20,9 @@ Integrada aos dados do carregador **GoodWe HCA G2** instalado no **Energy Innova
 1. **Faturamento Justo e Individualizado:** Rateio baseado estritamente na energia consumida em quilowatt-hora ($\text{Fatura} = \text{kWh} \times \text{Tarifa}$), eliminando divisões genéricas na taxa de condomínio;
 2. **Inteligência Artificial Conversacional (IA EVA):** Assistente virtual com injeção dinâmica de contexto para tirar dúvidas de autonomia, custos e status da bateria;
 3. **Simulador Paramétrico de Recarga:** Ferramenta interativa que correlaciona tempo de conexão, energia necessária e valor financeiro;
-4. **Arquitetura Modular em FastAPI:** API REST escalável com documentação OpenAPI (`/docs`), servindo nativamente a interface web.
+4. **Machine Learning & Analytics:** Análise do perfil de uso, previsão de demanda por dia da semana e precificação dinâmica por horário de início da recarga;
+5. **Dashboard Administrativo:** Painel gerencial com consumo, faturamento, eficiência energética, usuários, carregadores e pagamentos;
+6. **Arquitetura Modular em FastAPI:** API REST escalável com documentação OpenAPI (`/docs`), servindo nativamente a interface web.
 
 ---
 
@@ -31,9 +33,16 @@ Para garantir um protótipo com código 100% autoral, robusto e compatível com 
 | Decisão / Desvio | Motivação & Limitação Técnica | Solução Implementada |
 | :--- | :--- | :--- |
 | **Backend em Python/FastAPI (Substituição do n8n)** | Plataformas low-code ocultam regras de negócio, geram dependência externa e enfraquecem a comprovação de autoria exigida na FIAP. | API autoral em **FastAPI**, com rotas documentadas (`/docs`), validação via Pydantic e execução assíncrona de alta performance. |
-| **Ingestão via CSV Tratado da GoodWe** | O acesso à API oficial do SEMS+ não foi disponibilizado em tempo hábil para o ciclo de desenvolvimento. | Exportações periódicas de dados da estação GoodWe consolidadas no pipeline em `backend/data/tratados/estacao_diario.csv`. |
-| **IA EVA com RAG em Memória / Context Injection** | Garantir respostas precisas sobre faturas e baterias sem risco de alucinação e com alta velocidade de resposta. | Injeção dinâmica do perfil do morador, veículo cadastrado, tarifa e histórico real do GoodWe diretamente no prompt da IA. |
-| **Simulação Lógica de Sessão e Checkout** | Restrições logísticas de rede local e hardware RFID dedicado no estacionamento L1 da FIAP. | Autorização de recarga e checkout simulados via interface web integrada à API. |
+| **Ingestão por exportação manual do SEMS+ (em vez de API)** | Conforme a apresentação da GoodWe, não há suporte de API para os EV Chargers (a consulta é do tipo *pull*, sem tempo real). O que foi liberado é o acesso à planta de monitoramento no SEMS+. | 13 relatórios mensais em **XLSX** (set/2025 a set/2026) e 2 **PDFs** com o registro de carregamento, tratados por scripts Python em `backend/scripts/data_scripts`. |
+| **Dados da estação em formato diário e agregado** | Os XLSX são o relatório diário da planta inteira. Não trazem sessão, usuário, veículo nem horário de uso. | `estacao_diario.csv` (395 dias x 13 indicadores) é usado como série de contexto. As sessões vêm do registro de carregamento do SEMS+. |
+| **Usuários e veículos simulados sobre sessões reais** | As sessões reais vêm de um único carregador e de um único cartão RFID. Não há dados de vários moradores nem do modelo do carro. | `gerar_sessoes_condominio.py` atribui cada sessão real a um de 5 usuários simulados, com 3 modelos do catálogo (Mercedes-Benz EQE 350+, BYD Seal e Volvo EX30), por sorteio com semente fixa (42). Horários, kWh e durações são reais. Usuário e veículo são simulados. |
+| **Persistência em CSV (tabelas) e JSON (metadados)** | Prototipação rápida com pandas, e dados tabulares são mais simples em CSV, sem necessidade de SGBD. | `estacao_diario.csv`, `sessoes_reais.csv`, `sessoes_condominio.csv` e `veiculos.csv` em `backend/data`. O JSON guarda os metadados do condomínio (`ev_chargeops_data.json`, com valores padrão no `data_service` quando o arquivo não existe). |
+| **Tarifa como parâmetro do sistema** | Os valores em R$ dos XLSX usam uma tarifa fixa de R$ 1,00 por kWh, que não representa uma tarifa real. | `DEFAULT_RATE_PER_KWH` em `config.py` (R$ 0,95, configurável por `.env`). Valor provisório, a confirmar com o grupo. |
+| **Potência e tempo de recarga calibrados com dados reais** | O carregador de referência é de 7 kW, mas nas sessões reais a potência média foi de cerca de 2,1 kW. Usar a potência nominal subestima o tempo de recarga em cerca de 3 vezes. | O simulador usa uma relação calibrada nas 242 sessões reais: tempo (h) = 0,94 + 0,366 x kWh (R² 0,86, erro médio de 22 minutos), com a potência nominal como piso físico. |
+| **IA EVA com RAG em Memória / Context Injection** | Garantir respostas precisas sobre faturas e baterias sem risco de alucinação e com alta velocidade de resposta. | Injeção dinâmica do perfil do morador, veículo cadastrado, tarifa e histórico das sessões diretamente no prompt da IA. |
+| **Descontinuação da conexão direta aos carregadores** | Restrições logísticas de rede local e segurança no Energy Innovation Lab da FIAP (Estacionamento L1). | O controle e a simulação das sessões operam sobre o fluxo de dados coletados, desacoplados do acionamento físico. |
+| **Substituição de RFID / Bluetooth por simulação lógica de sessão e checkout** | Limitações de disponibilidade de hardware dedicado (leitores e tags) e complexidade de integração embarcada na fase atual. | Identificação do usuário, autorização de recarga e checkout simulados via interface web integrada à API. |
+| **Dashboard em código, sem ferramenta de BI** | Mesmo motivo da troca do n8n: manter a regra de negócio no código do grupo. | Dashboard em FastAPI + Chart.js (ver seção 8.5). |
 
 ---
 
@@ -46,19 +55,21 @@ Construída com **Python 3**, **FastAPI** e **Uvicorn**, a API centraliza as reg
   - `/api/chat`: Processamento de linguagem natural com a IA EVA e sugestão de perguntas frequentes;
   - `/api/sessions`: Listagem sanitizada do histórico de recargas e agregações de telemetria (`/metrics`);
   - `/api/billing`: Cálculo oficial de rateio por kWh, decomposição de custos e simulador paramétrico;
-  - `/api/analytics`: Ponto de integração para modelos de Machine Learning (Victor);
-  - `/api/admin`: Ponto de integração para métricas executivas e gestão de condomínio (Bruno);
+  - `/api/analytics`: Integração com os modelos de Machine Learning (Victor);
+  - `/api/admin`: Métricas executivas e gestão de condomínio (Bruno);
   - `/health` e `/api/status`: Verificação de integridade e metadados operacionais.
 - **Servidor Web Integrado:** A API monta e serve automaticamente os arquivos estáticos da interface web na raiz (`/`).
 
-### 3.2. Pipeline de Ingestão de Dados (`estacao_diario.csv`)
-A fonte oficial de dados da aplicação é o arquivo `backend/data/tratados/estacao_diario.csv`, contendo **395 dias de dados históricos** do carregador GoodWe HCA G2:
-- O `DataService` filtra e sanitiza os **285 registros de recarga efetiva** (> 0 kWh);
-- Converte os dados diários em sessões individuais de recarga completas com identificador único, data/hora, condômino, veículo elétrico, duração estimada no carregador de 7.4 kW e valor do rateio;
+### 3.2. Pipeline de Ingestão de Dados (`sessoes_condominio.csv`)
+A fonte das sessões de recarga é o arquivo `backend/data/tratados/sessoes_condominio.csv`, gerado a partir do registro de carregamento do SEMS+ do carregador GoodWe (ver seção 6.1). O arquivo `estacao_diario.csv` (**395 dias** de dados da planta) fica como série de contexto:
+- O `DataService` lê as **242 sessões** do condomínio (caminho `SESSIONS_CSV_PATH` em `config.py`; o caminho `STATION_CSV_PATH` aponta para o arquivo da estação);
+- Converte cada linha em uma sessão de recarga com identificador único, data/hora, condômino, veículo elétrico, duração e valor do rateio;
 - Alimenta os KPIs em tempo real:
-  - **Energia Total Registrada:** `387.20 kWh`
-  - **Faturamento Total:** `R$ 367.54`
-  - **Total de Sessões:** `285 recargas concluídas`
+  - **Energia Total Registrada:** `1883.12 kWh`
+  - **Faturamento Total:** `R$ 1788.84` (tarifa de R$ 0,95/kWh)
+  - **Total de Sessões:** `242 recargas concluídas`
+
+> Os valores de energia e de faturamento vêm das sessões. A coluna `energia_carregada_kwh` da estação (387,2 kWh) **não** é recarga de veículos e não entra nesses KPIs (ver seção 10.2).
 
 ### 3.3. IA EVA - Assistente Virtual Inteligente
 A **EVA** (*Energy Virtual Assistant*) foi desenvolvida com arquitetura de alta resiliência (*Dual Engine*):
@@ -67,9 +78,9 @@ A **EVA** (*Energy Virtual Assistant*) foi desenvolvida com arquitetura de alta 
 2. **Modo Especialista Autônomo (Offline Engine):** Caso a API externa esteja indisponível ou sem chave configurada, um motor especialista baseado em regras técnicas entra em ação imediatamente, garantindo que o protótipo nunca falhe na avaliação.
 
 **Consultas Obrigatórias Suportadas em Linguagem Natural:**
-- *“Quantas horas o carro aguenta com a bateria atual?”* → Calcula a autonomia urbana e mista com base na capacidade da bateria cadastrada (ex: 44.9 kWh do BYD Dolphin);
-- *“Quantos kWh faltam para completar a carga?”* → Calcula o volume em kWh até 100% e o tempo estimado de conexão no GoodWe HCA G2 (7.4 kW / eficiência de 92%);
-- *“Qual será o custo estimado da recarga?”* → Aplica a fórmula oficial de rateio e decompõe energia efetiva e quota de manutenção;
+- *“Quantas horas o carro aguenta com a bateria atual?”* → Calcula a autonomia estimada com base na capacidade da bateria do veículo cadastrado (ex: 82,5 kWh do BYD Seal);
+- *“Quantos kWh faltam para completar a carga?”* → Calcula o volume em kWh e o tempo estimado de conexão no GoodWe HCA G2 (7.4 kW / eficiência de 92%);
+- *“Qual será o custo estimado da recarga?”* → Aplica a fórmula oficial de rateio ao volume da recarga;
 - *“Como funciona o modelo de rateio por kWh?”* → Explica os pilares da cobrança individualizada.
 
 ### 3.4. Frontend Web Centralizador (`/frontend`)
@@ -79,7 +90,8 @@ Aplicação Web responsiva desenvolvida em **HTML5**, **CSS3 (Vanilla)** e **Jav
 - **Painel de KPIs:** Exibição dinâmica da energia entregue, faturamento acumulado, especificações do carregador GoodWe e tarifa ativa;
 - **Aba IA EVA:** Chat interativo com histórico, botões de perguntas rápidas e indicador de digitação;
 - **Aba Simulador de Recarga:** Sliders interativos de SoC inicial e final (%), cálculo instantâneo de kWh necessários, tempo estimado de carga e botão de simulação de autorização/pagamento;
-- **Aba Telemetria GoodWe:** Tabela completa com paginação e histórico das 285 sessões sanitizadas.
+- **Aba Telemetria GoodWe:** Tabela com paginação e histórico das 242 sessões;
+- **Aba Dashboard Administrativo:** Métricas, gráficos e painel de consulta (ver seção 8).
 
 ---
 
@@ -122,59 +134,195 @@ Aplicação Web responsiva desenvolvida em **HTML5**, **CSS3 (Vanilla)** e **Jav
    - **Documentação Swagger (OpenAPI):** [http://localhost:8000/docs](http://localhost:8000/docs)
    - **Documentação Redoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
+> Alternativa com um comando só: `iniciar.bat` (Windows) ou `bash iniciar.sh` (Git Bash, Linux ou Mac). Detalhes na seção 8.6.
+
+### Variáveis de Ambiente (`backend/.env`)
+
+| Variável | Padrão | Função |
+| :--- | :--- | :--- |
+| `OPENAI_API_KEY` | vazio | Ativa o Modo Conectado da IA EVA. Sem ela, vale o motor especialista autônomo |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Modelo usado pela EVA no Modo Conectado |
+| `DEFAULT_RATE_PER_KWH` | `0.95` | Tarifa base do rateio (R$/kWh) |
+| `HOST` e `PORT` | `0.0.0.0` e `8000` | Endereço e porta do servidor |
+
 ---
 
-## 5. Estrutura de Integração para os Demais Integrantes
+## 5. Estrutura de Integração entre os Módulos
 
-O backend foi preparado com pontos de conexão dedicados para que cada integrante conecte sua respectiva parte de forma simples e independente:
+O backend foi organizado com pontos de conexão dedicados para que cada integrante conecte sua respectiva parte de forma simples e independente:
 
 ```
-backend/
-├── app/
-│   ├── api/
-│   │   ├── routes_chat.py       # [Aelton] Rotas da IA EVA
-│   │   ├── routes_sessions.py   # [Aelton] Histórico de sessões e telemetria
-│   │   ├── routes_billing.py    # [Michelly] Tarifação e simulação de checkout
-│   │   ├── routes_analytics.py  # [Victor] Modelos e predições de Machine Learning
-│   │   └── routes_admin.py      # [Bruno] Métricas administrativas e gestão
-│   ├── services/
-│   │   ├── ai_eva_service.py    # [Aelton] Lógica conversacional da EVA
-│   │   ├── data_service.py      # [Aelton] Leitura e sanitização de estacao_diario.csv
-│   │   ├── billing_service.py   # [Michelly] Motor de rateio e pagamentos
-│   │   └── ml_service.py        # [Victor] Modelos preditivos de demanda e ML
-│   ├── main.py                  # Ponto central da API e servidor do Frontend
-│   └── config.py                # Configurações gerais da aplicação
-└── data/
-    └── tratados/
-        └── estacao_diario.csv   # Fonte de verdade oficial da GoodWe
+EV_ChargeOps/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── routes_chat.py       # [Aelton] Rotas da IA EVA
+│   │   │   ├── routes_sessions.py   # [Aelton] Histórico de sessões e telemetria
+│   │   │   ├── routes_billing.py    # [Michelly] Tarifação e simulação de checkout
+│   │   │   ├── routes_analytics.py  # [Victor] Previsão de demanda e precificação dinâmica
+│   │   │   └── routes_admin.py      # [Bruno] Métricas administrativas e gestão
+│   │   ├── services/
+│   │   │   ├── ai_eva_service.py    # [Aelton] Lógica conversacional da EVA
+│   │   │   ├── data_service.py      # [Aelton] Leitura e sanitização dos CSV tratados
+│   │   │   ├── billing_service.py   # [Michelly] Motor de rateio e pagamentos
+│   │   │   ├── ml_service.py        # [Victor] Modelo de demanda e precificação dinâmica
+│   │   │   └── dashboard_service.py # [Bruno] Métricas do dashboard (pandas)
+│   │   ├── schemas/models.py        # Modelos Pydantic de entrada e saída
+│   │   ├── main.py                  # Ponto central da API e servidor do Frontend
+│   │   └── config.py                # Configurações gerais da aplicação
+│   ├── data/
+│   │   ├── brutos/                  # Exportações originais do SEMS+ (13 XLSX e 2 PDF)
+│   │   ├── tratados/                # estacao_diario.csv, sessoes_reais.csv e sessoes_condominio.csv
+│   │   └── referencia/veiculos.csv  # Catálogo de veículos (3 modelos)
+│   ├── notebooks/                   # [Victor] Análise temporal e modelo de demanda
+│   ├── scripts/data_scripts/        # [Victor] Tratamento dos dados do SEMS+
+│   └── tests/                       # [Bruno] Testes automáticos do dashboard
+├── frontend/                        # Interface web (HTML, CSS e JavaScript)
+├── docs/                            # Documentação da Sprint 01 e Sprint 02
+├── imagens/                         # Evidências e diagramas
+├── iniciar.bat / iniciar.sh         # Execução com um comando
+└── README.md
 ```
+
+### Fluxo de Dados
+
+```mermaid
+flowchart TD
+    SEMS["SEMS+ (exportação manual)"] --> XLSX["13 XLSX diários da planta"]
+    SEMS --> PDF["2 PDFs do registro de carregamento"]
+    XLSX --> P1["tratar_xlsx.py e salvar_tratados.py"]
+    PDF --> P2["extrair_sessoes.py"]
+    P1 --> EST[("estacao_diario.csv")]
+    P2 --> REAIS[("sessoes_reais.csv")]
+    CAT[("veiculos.csv")] --> GER
+    REAIS --> GER["gerar_sessoes_condominio.py<br/>5 usuários simulados, semente 42"]
+    GER --> SESS[("sessoes_condominio.csv")]
+
+    SESS --> BACK["Backend FastAPI e IA EVA - Aelton<br/>data_service, rotas e chat"]
+    SESS --> PAY["Tarifação - Michelly<br/>billing_service"]
+    SESS --> ML["ML e Analytics - Victor<br/>ml_service"]
+    EST --> ML
+
+    ML -->|"previsão e tarifas"| PAY
+    ML -->|"previsão e métricas"| BACK
+    PAY -->|"regras de tarifação"| BACK
+    SESS --> DASH["Dashboard Administrativo - Bruno<br/>dashboard_service"]
+    EST --> DASH
+
+    BACK --> FRONT["Frontend Web - Aelton"]
+    DASH --> FRONT
+```
+
+> O diagrama `imagens/diagrama_arquitetura.png` é o fluxo planejado na Sprint 01. Em relação a ele, a Sprint 02 não usa banco de dados (os dados ficam em CSV e JSON) e não implementou a detecção de anomalias.
 
 ---
 
 ## 6. Módulo 2: Machine Learning & Analytics (Victor Mantovani)
 
-> *Espaço reservado para documentação dos modelos preditivos e análises de Victor Mantovani.*
+O módulo de ML analisa o padrão de uso do carregador, prevê a demanda diária de energia e propõe uma tarifa que incentiva a recarga fora do horário de pico. A lógica fica em `backend/app/services/ml_service.py` e é exposta em `/api/analytics`. A comparação completa entre os modelos testados está em `backend/notebooks/02_modelo_demanda.ipynb`.
 
-### Onde conectar seu código:
-- **Lógica dos Modelos:** `backend/app/services/ml_service.py`
-  - Métodos já preparados: `get_station_summary()` e `predict_demand()`.
-- **Rotas da API:** `backend/app/api/routes_analytics.py`
-  - Endpoints já disponíveis: `GET /api/analytics/summary` e `GET /api/analytics/demand-prediction`.
-- **Base de Dados:** Os dados tratados para treinamento e análise temporal estão disponíveis em `backend/data/tratados/estacao_diario.csv`.
+### 6.1. Tratamento dos Dados (`backend/scripts/data_scripts`)
 
-*(Victor: adicione aqui os detalhes dos modelos desenvolvidos, algoritmos utilizados, gráficos de previsão e insights de demanda).*
+| Script | O que faz |
+| :--- | :--- |
+| `tratar_xlsx.py` e `salvar_tratados.py` | Tratam os 13 XLSX mensais do SEMS+ e geram `estacao_diario.csv` (395 dias x 13 indicadores) |
+| `extrair_sessoes.py` | Extrai as sessões de recarga dos 2 PDFs do registro de carregamento e gera `sessoes_reais.csv` (266 sessões, 247 válidas com pelo menos 0,5 kWh, 1.960,91 kWh) |
+| `gerar_sessoes_condominio.py` | Atribui cada sessão real a um dos 5 usuários simulados e a um dos 3 veículos do catálogo (semente 42) e gera `sessoes_condominio.csv`, com 242 sessões |
 
+O catálogo `backend/data/referencia/veiculos.csv` reúne bateria total, autonomia no ciclo Inmetro e consumo oficial (PBE Veicular) de **Mercedes-Benz EQE 350+** (96 kWh), **BYD Seal** (82,5 kWh) e **Volvo EX30 Plus Extended Range** (69 kWh).
+
+> Horários, kWh e durações das sessões são reais. Usuário e veículo são simulados.
+
+### 6.2. Análise Temporal (`01_analise_temporal.ipynb`)
+
+Base: 242 sessões reais do carregador GoodWe (17/09/2025 a 29/09/2026), de um único carro e um único cartão RFID.
+
+| Aspecto | Resultado |
+| :--- | :--- |
+| **Hora** | 88% das sessões começam entre 17h e 23h. As 20h e 21h concentram 57% das sessões e 57% da energia |
+| **Dia da semana** | Só o sábado se destaca (mediana de 0 kWh, com 74% dos sábados sem recarga). Os demais dias são parecidos entre si |
+| **Mês** | De março a setembro/2026 a demanda é estável (cerca de 5,1 kWh por dia). Dezembro a fevereiro foram mais baixos, mas há uma única observação de cada mês, então não é possível afirmar sazonalidade |
+| **Perfil por sessão** | Energia média de 7,8 kWh e duração média de cerca de 3,8 horas. A potência média ficou em torno de 2,05 kW |
+| **Intermitência** | Entre 30% e 41% dos dias de semana não têm recarga, o que dificulta a previsão |
+
+### 6.3. Modelo de Previsão de Demanda
+
+**Modelo final:** mediana de kWh por dia da semana, calculada sobre os **378 dias** de sessões (sem recarga conta como 0 kWh). Cada data futura recebe a mediana histórica do seu dia da semana, então a previsão não depende do que aconteceu "ontem" e vale para qualquer horizonte (1 a 30 dias).
+
+**Validação por data:** treino de 17/09/2025 a 31/05/2026 (257 dias) e teste de 01/06 a 29/09/2026 (121 dias), medido pelo erro médio absoluto (MAE).
+
+| Modelo | MAE (kWh por dia) | Ganho sobre a linha de base |
+| :--- | :---: | :---: |
+| **Mediana por dia da semana (modelo final)** | **4,15** | +0,15 |
+| Regra B (ontem + sábado) | 4,24 | +0,06 |
+| Média por dia da semana (linha de base) | 4,30 | 0,00 |
+| Média geral | 4,51 | -0,21 |
+| Regra A (ontem) | 5,54 | -1,25 |
+| Ingênuo (mesmo dia da semana passada) | 5,78 | -1,48 |
+
+A mediana ficou em primeiro lugar em quatro datas de corte diferentes (01/03, 01/05, 01/06 e 01/07). Essas janelas de teste se sobrepõem, então os quatro resultados não são independentes.
+
+**Previsão por dia da semana (modelo final, kWh):**
+
+| seg | ter | qua | qui | sex | sáb | dom |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 5,24 | 5,48 | 5,76 | 6,04 | 4,61 | 0,00 | 6,72 |
+
+**Confiança informada pela API:** `1 - erro médio / nível médio do dia` no período de teste (acurácia = 1 - WAPE), limitada entre 0 e 1.
+
+> **Limitação:** o ganho sobre a linha de base é pequeno e o erro ainda é alto frente à média de 4,9 kWh por dia, porque a demanda é intermitente (dias sem recarga ou com recarga grande). O modelo estima o **dia típico** e não prevê picos isolados.
+
+### 6.4. Precificação Dinâmica por Horário de Início
+
+A tarifa depende da hora em que a sessão **começa** e vale para a sessão inteira.
+
+- **Pico:** janela de 2 horas com mais energia, calculada por `_horario_pico()` a partir do horário de início de cada sessão real. Resultado: sessões iniciadas das **20:00 às 21:59**, que concentram **56,8%** da energia;
+- **Tarifa do pico:** tarifa base x fator de pico (`FATOR_PICO = 1.20`);
+- **Tarifa fora do pico:** calculada para que a receita seja a mesma da tarifa fixa, desde que ninguém mude o horário de recarga.
+
+Com $p$ = parcela da energia no pico, $f$ = fator de pico e $T$ = tarifa base:
+
+$$T_{pico} = T \times f \qquad T_{fora} = T \times \frac{1 - p \times f}{1 - p}$$
+
+| Item | Valor |
+| :--- | :---: |
+| Tarifa base | R$ 0,95/kWh |
+| Tarifa no pico (20h às 21h59) | R$ 1,14/kWh |
+| Tarifa fora do pico | R$ 0,70/kWh (-26,3% sobre a base) |
+| Receita com tarifa fixa | R$ 1.788,96 |
+| Receita com tarifa dinâmica | R$ 1.788,96 |
+
+> Se parte do consumo sair do pico, o pico cai e a receita fica um pouco abaixo da tarifa fixa. A janela de pico é a de início das sessões; a carga na rede se estende por mais horas.
+
+### 6.5. Rotas da API
+Arquivo -> `routes_analytics.py`
+
+| Rota | O que devolve |
+| :--- | :--- |
+| `GET /api/analytics/summary` | Resumo das recargas (378 dias, 1.883,12 kWh, média de 4,98 kWh por dia) e do contexto da planta (geração, importação e exportação da rede) |
+| `GET /api/analytics/demand-prediction?days=7` | Previsão de demanda em kWh para os próximos 1 a 30 dias, com confiança, erro típico, metodologia e recomendação operacional |
+| `GET /api/analytics/dynamic-pricing` | Janela de pico, tarifas do pico e fora do pico, conferência de receita e tabela de tarifa por hora de início |
+
+### 6.6. Como Reproduzir as Análises
+
+Os notebooks usam as mesmas bases do backend (`backend/data/tratados`). Com o ambiente virtual ativo:
+
+```bash
+pip install jupyter
+cd backend/notebooks
+jupyter notebook
+```
 
 ---
+
 ## 7. Módulo 3: Sistema de Tarifação e Simulação de Pagamentos (Michelly Santos)
 
 ### 7.1 Regras de Negócio e Pagamentos
-*Arquivo billing_Servce.py (Motor de rateio e pagamentos) -> explicar oq cada função faz/métodos + regras de rateio +explicação do fluxo de pagamento + formulação matemática de tarifação, divisão de custos fixos vs energia e a documentação da simulação do checkout digital.
-O arquivo billing_service.py contém as funções necessárias para o cálculo dos custos, tarifas e pagamentos:
+O arquivo `billing_service.py` (motor de rateio e pagamentos) contém as funções necessárias para o cálculo dos custos, tarifas e pagamentos:
 
-- **Função calculate_tarifa_atual :** usa como base o horário atual para identificar se a tarifa deve ser o valor padrão ou se deve ser alterado para o valor das horas de pico. Note que para incentivar o carregamento fora do horário de pico encontrado, o cálculo da tarifa foi realizado para que a receita no fim do mês seja a mesma caso a tarifa fosse um valor fixo padrão independente do momento de carregamento. Para isso, foi adicionado um acréscimo sobre o valor padrão e, consequentemente, uma redução na tarifa das recargas fora do horário de pico.
+- **Função calculate_tarifa_atual:** usa como base o horário para identificar se a tarifa deve ser o valor padrão ou se deve ser alterado para o valor das horas de pico. Note que, para incentivar o carregamento fora do horário de pico encontrado, o cálculo da tarifa foi realizado para que a receita no fim do mês seja a mesma caso a tarifa fosse um valor fixo padrão independente do momento de carregamento. Para isso, foi adicionado um acréscimo sobre o valor padrão e, consequentemente, uma redução na tarifa das recargas fora do horário de pico. A tabela de tarifas vem de `ml_service.get_dynamic_pricing()` e, se ela não estiver disponível, vale a tarifa base.
 
-> Horário de pico: representa o momento em que a necessidade de enérgica aumenta para suprir o aumento da demanda. É calculado no arquivo ml_service.py (_horario_pico) que se baseia no horário real de início de cada sessão de recarga registrada pelo carregador GoodWe.
+> Horário de pico: representa o momento em que a necessidade de energia aumenta para suprir o aumento da demanda. É calculado no arquivo ml_service.py (_horario_pico) que se baseia no horário real de início de cada sessão de recarga registrada pelo carregador GoodWe.
 
 > Tarifa padrão: custo de energia de R$0,82/kWh + custo de manutenção de R$0,13/kWh = R$0,95/kWh
 > Fator adicionado a tarifa padrão no horário de pico: 1.20
@@ -187,18 +335,21 @@ O arquivo billing_service.py contém as funções necessárias para o cálculo d
 >   Tarifa dentro do horário de pico = R$0,95/kWh * 1.20 = R$1,14/kWh 
 >   Tarifa fora do horário de pico = R$0,70/kWh
 
-- **Função calculate_rateio :** recebe a tarifa atual, que varia de acordo com o horário e o valor da energia consumida e calcula o valor do rateio/fatura, indicando se houve aumento ou redução da tarifa base em decorrência do horário.
-- **Função simulate_charge :** se baseia na disponibilidade de energia no momento, nos dados do veículo e na tarifa de acordo com o momento para devolver uma resposta a solicitação do usuário de simulação de carregamento
-- **Função process_checkout_simulation :** gera um comprovante com dados da sessão de carregamento simulando um pagamento real.
+- **Função calculate_rateio:** recebe a tarifa atual, que varia de acordo com o horário, e o valor da energia consumida e calcula o valor do rateio/fatura, indicando se houve aumento ou redução da tarifa base em decorrência do horário. Fórmula: `Valor = Energia (kWh) × R$ Rateio/kWh`.
+- **Função simulate_charge:** relaciona tempo, energia e custo. Calcula a energia necessária a partir da capacidade da bateria e do SoC inicial e final (padrões: bateria de 69 kWh, 20% a 80%), estima o tempo e o custo pela tarifa do momento e devolve a autonomia adicionada.
+  - **Tempo de recarga:** relação calibrada nas 242 sessões reais, `tempo (h) = 0,94 + 0,366 × energia (kWh)` (R² 0,86 e erro médio de 22 minutos), com a potência nominal (padrão de 7 kW) como piso físico;
+  - **Autonomia adicionada:** `energia × (autonomia Inmetro ÷ capacidade total da bateria)`. Sem a autonomia do veículo, usa 4,6 km/kWh (média dos 3 modelos do catálogo).
+- **Função process_checkout_simulation:** gera um comprovante com dados da sessão de carregamento (status, identificador da transação, unidade, energia, tarifa, valor e forma de pagamento) simulando um pagamento real.
 
 ### 7.2 Rotas da API
 Arquivo -> routes_billing.py
+
 | Rota | O que devolve |
 |---|---|
-| POST /api/billing/calculate | Cálculo da fatura pelo modelo de rateio 
-| POST /api/billing/simulate | Simulador paramétrico de recarga 
-| POST /api/billing/checkout | Simulação de checkout e autorização de recarga com recibo 
-| GET /api/billing/config | Retorna parâmetros tarifários do condomínio
+| POST /api/billing/calculate | Cálculo da fatura pelo modelo de rateio |
+| POST /api/billing/simulate | Simulador paramétrico de recarga |
+| POST /api/billing/checkout | Simulação de checkout e autorização de recarga com recibo |
+| GET /api/billing/config | Retorna parâmetros tarifários do condomínio |
 
 ---
 
@@ -215,7 +366,7 @@ cadastro de usuarios ----+
 ```
 
 | Arquivo | O que faz |
-|---|---|
+| :--- | :--- |
 | `backend/app/services/dashboard_service.py` | Calcula as métricas, as séries mensais, o resumo por usuário e veículo, os pagamentos e os dados do carregador |
 | `backend/app/api/routes_admin.py` | Rotas `/api/admin/*`. As três rotas que já existiam foram mantidas |
 | `frontend/js/dashboard.js` e `frontend/css/dashboard.css` | Aba do dashboard: busca os dados na API e desenha cartões, gráficos e tabelas |
@@ -225,7 +376,7 @@ cadastro de usuarios ----+
 ### 8.2 Rotas
 
 | Rota | O que devolve |
-|---|---|
+| :--- | :--- |
 | `GET /api/admin/dashboard` | Métricas, séries mensais, resumo por usuário e veículo e avisos. Aceita os filtros `user_id`, `inicio` e `fim` (AAAA-MM-DD) |
 | `GET /api/admin/payments` | Histórico de pagamentos por sessão, com paginação (`limit` e `offset`) |
 | `GET /api/admin/chargers` | Dados do carregador e indicadores de uso |
@@ -234,7 +385,7 @@ cadastro de usuarios ----+
 ### 8.3 Métricas e como são calculadas
 
 | Métrica | Fonte | Cálculo |
-|---|---|---|
+| :--- | :--- | :--- |
 | Consumo | `sessoes_condominio.csv` | Soma de `energy_delivered_kwh` (total, média por sessão, por mês e por usuário) |
 | Bateria | `sessoes_condominio.csv` | Estimativa: energia entregue dividida pela capacidade da bateria do veículo, por sessão |
 | Tempo médio de carga | `sessoes_condominio.csv` | Média de `duration_minutes` (também mediana e maior sessão) |
@@ -292,20 +443,149 @@ A documentação das rotas fica em `http://localhost:8000/docs`.
 
 ## 9. Evidências de Funcionamento (Sprint 02)
 
-> *Seção reservada para a inclusão das capturas de tela e demonstração técnica da solução integrada antes da entrega final.*
+### 9.1 Testes automáticos
 
-- [ ] Captura de tela da documentação interativa Swagger (`/docs`);
-- [ ] Captura de tela do chat interativo com a IA EVA respondendo em linguagem natural;
-- [ ] Captura de tela da simulação paramétrica de recarga e cálculo de rateio;
-- [ ] Captura de tela da tabela de histórico com as 285 sessões do GoodWe HCA G2;
-- [ ] Link do vídeo pitch de 3 minutos para validação presencial da FIAP.
+Execução de `python -m pytest tests -q` na pasta `backend` (09/10/2026):
 
-### Dashboard Administrativo (Bruno Santos)
+```
+........                                                                 [100%]
+8 passed
+```
 
-Capturas de tela da aba, com a API rodando em `http://localhost:8000`:
+### 9.2 Respostas reais da API
 
-![Cartões de métricas e gráficos](imagens/dashboard_cartoes_graficos.png)
+Respostas obtidas com a API rodando sobre as 242 sessões do condomínio.
 
-![Limitações dos dados e tabela de usuários e veículos](imagens/dashboard_usuarios_limitacoes.png)
+`GET /api/sessions/metrics`
+```json
+{
+  "total_energy_kwh": 1883.12,
+  "total_revenue_brl": 1788.84,
+  "total_sessions_count": 242,
+  "average_session_duration_minutes": 227.1,
+  "average_energy_per_session_kwh": 7.78,
+  "active_chargers_count": 1,
+  "current_rate_per_kwh": 0.95
+}
+```
+
+`POST /api/billing/simulate` com bateria de 69 kWh, de 20% a 80%
+```json
+{
+  "energy_needed_kwh": 41.4,
+  "estimated_time_hours": 16.09,
+  "estimated_time_formatted": "16h 05min",
+  "total_cost_brl": 39.33,
+  "estimated_added_range_km": 190.4
+}
+```
+
+`GET /api/analytics/dynamic-pricing` (trecho)
+```json
+{
+  "tarifa_base_brl_kwh": 0.95,
+  "fator_pico": 1.2,
+  "janela_pico": { "hora_inicio": 20, "hora_fim": 21 },
+  "parcela_energia_pico_pct": 56.8,
+  "tarifa_pico_brl_kwh": 1.14,
+  "tarifa_fora_pico_brl_kwh": 0.7,
+  "variacao_fora_pico_pct": -26.3
+}
+```
+
+### 9.3 Notebooks com saídas executadas
+
+- `backend/notebooks/01_analise_temporal.ipynb`: análise de hora, dia da semana e mês das 242 sessões (seção 6.2);
+- `backend/notebooks/02_modelo_demanda.ipynb`: validação por data e comparação entre modelos de previsão (seção 6.3).
+
+### 9.4 Capturas de tela
+
+Capturas de tela da aplicação, com a API rodando em `http://localhost:8000`.
+
+#### IA EVA
+
+Chat com a EVA respondendo em linguagem natural à pergunta "Quantas horas o carro aguenta com a bateria atual?", com base na bateria do veículo cadastrado (BYD Seal, 82,5 kWh):
+
+![Chat com a IA EVA](imagens/Assistente%20Eva.png)
+
+#### Simulador de Recarga e Rateio
+
+Simulação paramétrica com bateria de 44,9 kWh, de 13% a 68% de carga: energia necessária, tempo estimado, custo pela fórmula `Fatura = kWh x Tarifa` (R$ 0,95/kWh), decomposição entre energia efetiva e quota de manutenção e autorização simulada:
+
+![Simulador de recarga e rateio](imagens/Simulador%20e%20Rateio.png)
+
+#### Telemetria e Histórico
+
+Tabela de sessões de recarga do carregador GoodWe HCA G2, com condômino, unidade, veículo, início, duração, energia, rateio e status:
+
+![Telemetria e histórico de sessões](imagens/Telemetria%20e%20Hist%C3%B3tico.png)
+
+#### Dashboard Administrativo (Bruno Santos)
+
+Cartões de métricas, gráficos, carregadores e histórico de pagamentos:
+
+![Cartões de métricas](imagens/dashboard_cartoes.png)
+
+![Gráficos do dashboard](imagens/dashboard_graficos.png)
 
 ![Tabela de carregadores e histórico de pagamentos](imagens/dashboard_carregadores_pagamentos.png)
+
+---
+
+## 10. Dados Utilizados e Limitações Conhecidas
+
+### 10.1 Arquivos de dados
+
+| Arquivo | Origem | Conteúdo | Natureza |
+| :--- | :--- | :--- | :--- |
+| `data/brutos/Station Statistical Report(...).xlsx` (13 arquivos) | Exportação do SEMS+ | Relatório diário da planta, 13 indicadores, set/2025 a set/2026 | Real |
+| `data/brutos/Registo de carregamento ... .pdf` (2 arquivos) | Exportação do SEMS+ | Registro das sessões de recarga (início, fim, duração, kWh) | Real |
+| `data/tratados/estacao_diario.csv` | `tratar_xlsx.py` e `salvar_tratados.py` | 395 dias x 13 colunas, uma linha por dia | Real, tratado |
+| `data/tratados/sessoes_reais.csv` | `extrair_sessoes.py` | 266 sessões, 247 válidas (pelo menos 0,5 kWh), 1.960,91 kWh | Real, tratado |
+| `data/referencia/veiculos.csv` | PBE Veicular/Inmetro e divulgações dos fabricantes | 3 modelos: bateria total, autonomia Inmetro e consumo oficial (MJ/km) | Criado pelo grupo a partir de fontes públicas |
+| `data/tratados/sessoes_condominio.csv` | `gerar_sessoes_condominio.py` | 242 sessões com usuário e veículo atribuídos | Horários, kWh e durações reais. Usuário e veículo simulados |
+
+### 10.2 Limitações dos dados da estação (XLSX)
+
+- Os valores em R$ usam tarifa fixa de R$ 1,00 por kWh. Não são uma tarifa real.
+- A coluna `energia_carregada_kwh` (total de 387,2 kWh no período, máximo de 9,1 kWh por dia) **não é a recarga dos carros**: as sessões somam 1.960,9 kWh. A planta informa 0 kWh de armazenamento, e o que essa coluna mede segue sem explicação. Ela não é usada na lógica de recarga nem nos modelos.
+- A relação consumo = importação + autoconsumo só fecha em cerca de 59% dos dias (160 de 395 não fecham). A diferença típica é pequena (0,3 a 0,4 kWh), com poucos dias de diferença negativa grande (mínimo de -6,2 kWh).
+- Em setembro/2025, a geração foi de 0,4 kWh e a exportação de 241 kWh, uma inconsistência não explicada.
+- Os dados são diários e da planta inteira. Não permitem análise por horário.
+
+### 10.3 Limitações dos dados de sessão (SEMS+)
+
+- Todas as sessões usadas vêm de um único cartão RFID e de um único carregador. A demanda de um condomínio com vários moradores é simulada a partir desse padrão.
+- Seis sessões do início de setembro/2025 não têm cartão e têm potência bem maior (cerca de 5,5 kW, com uma sessão de 41,62 kWh). Parecem testes ou outro veículo e ficaram fora do conjunto do condomínio.
+- O "quilômetro" mostrado no aplicativo do SEMS+ é sempre 5 km por kWh (fator fixo do app). Não é uma medição do carro.
+- Os campos "energia verde" e "energia importada" do aplicativo não parecem medição confiável (quase 100% verde e 0 importada, mesmo à noite) e não são usados.
+- A potência máxima observada é de 3,4 a 3,5 kW, o que equivale a 16 A em 220 V. Não foi confirmado se o limite vem do carro ou da configuração do carregador.
+
+### 10.4 Limitações dos modelos e do protótipo
+
+- A previsão de demanda estima o dia típico (mediana) e não prevê picos isolados. O ganho sobre a linha de base é pequeno (seção 6.3).
+- O catálogo de veículos tem uma inconsistência de convenção: o consumo oficial do Inmetro (MJ/km) e a conta capacidade ÷ autonomia não coincidem (a segunda dá um consumo de 26% a 41% maior). O simulador usa capacidade ÷ autonomia.
+- A potência de carga em corrente alternada dos carros não foi incluída, porque o carregador de referência limita a recarga.
+- Autorização de recarga e checkout são simulados. Não há integração com o hardware do carregador nem com meio de pagamento real.
+- Não há banco de dados, login ou gestão de credenciais.
+
+### 10.5 Pendências em aberto
+
+- Confirmar no SEMS+ o modelo do carregador do laboratório (a apresentação da GoodWe indica o GW7K-HCA-20, de 7 kW) e a corrente configurada. O código usa 7,4 kW na EVA e 7 kW no simulador;
+- Definir a tarifa final do condomínio (hoje R$ 0,95/kWh, provisória);
+- Decidir a convenção de consumo dos veículos;
+- Esclarecer o que a coluna `energia_carregada_kwh` mede (baixa prioridade);
+- Verificar se o consumo diário da planta inclui a energia do carregador.
+
+---
+
+## 11. Documentação Complementar
+
+Os documentos de apoio ficam na pasta `docs/`:
+
+| Arquivo | Conteúdo |
+| :--- | :--- |
+| `Decisões Sprint 2.md` | Decisões técnicas, desvios, dados utilizados, limitações e pendências da Sprint 02 |
+| `exigencias_sprint2.md` | Guia e rubrica de avaliação da Sprint 02 |
+| `Definição do trabalho.pdf` | Definição do desafio |
+| `Frente_1_Contexto_e_Mercado_rev.docx`, `Frente 2 - Mapeamento APIs Complementares (1).docx`, `Frente 3 - Camadas e Fluxos de Dados.docx`, `Frente 4.pdf` | Entregas da Sprint 01 |
