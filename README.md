@@ -622,6 +622,7 @@ Os documentos de apoio ficam na pasta `docs/`:
 | Arquivo | Conteúdo |
 | :--- | :--- |
 | `Decisões Sprint 2.md` | Decisões técnicas, desvios, dados utilizados, limitações e pendências da Sprint 02 |
+| `Uso de IA.md` | Registro de como a equipe usou ferramentas de IA no desenvolvimento |
 | `exigencias_sprint2.md` | Guia e rubrica de avaliação da Sprint 02 |
 | `Definição do trabalho.pdf` | Definição do desafio |
 | `Frente_1_Contexto_e_Mercado_rev.docx`, `Frente 2 - Mapeamento APIs Complementares (1).docx`, `Frente 3 - Camadas e Fluxos de Dados.docx`, `Frente 4.pdf` | Entregas da Sprint 01 |
