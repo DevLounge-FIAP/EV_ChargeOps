@@ -260,7 +260,7 @@ class MlService:
                 "receita_tarifa_fixa_brl": round(t["receita_fixa"], 2),
                 "receita_tarifa_dinamica_brl": round(t["receita_dinamica"], 2),
             },
-            "tabela_por_hora_inicio": tabela,
+            "tabela_hora_inicio": tabela,
             "observacoes": [
                 "A janela de pico é a de início das sessões; a carga na rede se estende por mais horas.",
                 "Se parte do consumo sair do pico, o pico cai e a receita fica um pouco abaixo da tarifa fixa.",

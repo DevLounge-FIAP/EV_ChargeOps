@@ -19,7 +19,7 @@ TEMPO_POR_KWH_H = 0.366
 KM_POR_KWH_PADRAO = 4.6
 
 class BillingService:
-    def calculate_tarifa_atual(hora=None):
+    def calculate_tarifa_atual(self, hora=None):
             """
                 Calcula a tarifa com base no horário atual
             """
